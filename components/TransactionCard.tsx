@@ -2,7 +2,28 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-const mockTransactions = [
+// Add these type definitions at the top
+type Transaction = {
+  id: string;
+  type: 'income' | 'expense';
+  category: keyof CategoryIcons;
+  merchant: string;
+  amount: number;
+  date: string;
+};
+
+type CategoryIcons = {
+  shopping: 'cart' | 'shopping';
+  salary: 'cash';
+  transport: 'car';
+  food: 'food';
+  utilities: 'lightning-bolt';
+  entertainment: 'movie';
+  other: 'dots-horizontal';
+};
+
+// Update the mock data to use the correct icon names
+const mockTransactions: Transaction[] = [
   {
     id: '1',
     type: 'expense',
@@ -29,16 +50,39 @@ const mockTransactions = [
   },
 ];
 
-const getCategoryIcon = (category) => {
-  const icons = {
-    shopping: 'cart',
-    salary: 'cash',
-    transport: 'car',
-  };
-  return icons[category] || 'cash';
+type CategoryColors = {
+  [K in keyof CategoryIcons]: string;
+};
+
+const categoryIcons: CategoryIcons = {
+  shopping: 'cart',
+  salary: 'cash',
+  transport: 'car',
+  food: 'food',
+  utilities: 'lightning-bolt',
+  entertainment: 'movie',
+  other: 'dots-horizontal'
+};
+
+const categoryColors: CategoryColors = {
+  shopping: '#FF6B6B',
+  salary: '#51CF66',
+  transport: '#339AF0',
+  food: '#FAB005',
+  utilities: '#845EF7',
+  entertainment: '#FF922B',
+  other: '#868E96'
 };
 
 export default function TransactionCard() {
+  // Update the getCategoryIcon function
+  const getCategoryIcon = (category: keyof CategoryIcons) => {
+    return categoryIcons[category] || categoryIcons.other;
+  };
+
+  const getCategoryColor = (category: keyof CategoryColors) => {
+    return categoryColors[category] || categoryColors.other;
+  };
   return (
     <View style={styles.container}>
       {mockTransactions.map((transaction) => (

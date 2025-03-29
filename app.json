@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "a0-project",
-    "slug": "snack-c2e8640c-8739-418b-b109-1afb3eda8544",
+    "name": "Financial Copilot",
+    "slug": "financial-copilot",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -12,18 +12,33 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "ios": {
-      "supportsTablet": true
-    },
     "android": {
+      "package": "com.financialcopilot.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
+      },
+      "permissions": [
+        "READ_SMS",
+        "RECEIVE_SMS",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "POST_NOTIFICATIONS"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-document-picker",
+        {
+          "iCloudContainerEnvironment": "Production"
+        }
+      ]
+    ],
+    "description": "AI-Powered Financial Management App",
+    "extra": {
+      "eas": {
+        "projectId": "f5abb6c0-c112-4c5c-9d2a-537c3116f619"
       }
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
-    "description": "Quickly generate React Native components with AI"
+    }
   }
 }

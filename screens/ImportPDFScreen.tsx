@@ -4,8 +4,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { toast } from 'sonner-native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../types/navigation';
 
-export default function ImportPDFScreen({ navigation }) {
+type ImportPDFScreenProps = {
+  navigation: NativeStackNavigationProp<RootStackParamList, 'ImportPDF'>;
+};
+
+export default function ImportPDFScreen({ navigation }: ImportPDFScreenProps) {
   const [loading, setLoading] = useState(false);
 
   const handlePDFPick = async () => {
@@ -14,7 +20,7 @@ export default function ImportPDFScreen({ navigation }) {
         type: 'application/pdf',
       });
 
-      if (result.type === 'success') {
+      if (!result.canceled) {
         setLoading(true);
         // Here you would normally upload and process the PDF
         // For demo purposes, we'll simulate processing

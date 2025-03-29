@@ -5,6 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import Toast from 'react-native-toast-message';
 
 import HomeScreen from './screens/HomeScreen';
 import SettingsScreen from './screens/SettingsScreen';
@@ -15,6 +16,7 @@ import AssistantScreen from './screens/AssistantScreen';
 import BudgetGoalsScreen from './screens/BudgetGoalsScreen';
 import LoginScreen from './screens/LoginScreen';
 import OnboardingScreen from "./screens/OnboardingScreen";
+import ImportPDFScreen from './screens/ImportPDFScreen';
 
 import { RootStackParamList } from './types/navigation';
 
@@ -64,17 +66,36 @@ function MainTabs() {
   );
 }
 
-
 export default function App() {
   return (
     <NavigationContainer>
-        <Stack.Navigator initialRouteName="MainTabs">
-        <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
+      <Stack.Navigator initialRouteName="Onboarding">
+        {/* Show Onboarding first */}
+        <Stack.Screen 
+          name="Onboarding" 
+          component={OnboardingScreen} 
+          options={{ headerShown: false }} 
+        />
+
+        {/* After onboarding, go to Login */}
+        <Stack.Screen 
+          name="Login" 
+          component={LoginScreen} 
+          options={{ headerShown: false }} 
+        />
+
+        {/* After login, go to the main tabs (Assistant, Home, Import) */}
+        <Stack.Screen 
+          name="MainTabs" 
+          component={MainTabs} 
+          options={{ headerShown: false }} 
+        />
+
+        {/* Other Screens */}
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="Explore" component={ExploreScreen} />
         <Stack.Screen name="Transactions" component={TransactionsScreen} />
-        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-        <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="ImportPDF" component={ImportPDFScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
