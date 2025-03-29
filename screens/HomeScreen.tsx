@@ -2,11 +2,17 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../types/navigation';
 import TransactionCard from '../components/TransactionCard';
 import BalanceHeader from '../components/BalanceHeader';
 import ImportButton from '../components/ImportButton';
 
-export default function HomeScreen({ navigation }) {
+type HomeScreenProps = {
+  navigation: NativeStackNavigationProp<RootStackParamList, 'MainTabs'>;
+};
+
+export default function HomeScreen({ navigation }: HomeScreenProps) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -18,7 +24,9 @@ export default function HomeScreen({ navigation }) {
       
       <ScrollView style={styles.content}>
         <BalanceHeader />
-        <ImportButton />
+        <TouchableOpacity onPress={() => navigation.navigate('Explore')}>
+          {/* <ImportButton /> */}
+        </TouchableOpacity>
         
         <View style={styles.transactionsHeader}>
           <Text style={styles.sectionTitle}>Recent Transactions</Text>

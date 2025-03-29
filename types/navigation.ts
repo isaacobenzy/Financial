@@ -9,6 +9,7 @@ export type RootStackParamList = {
   ImportSMS: undefined;
   ImportPDF: undefined;
   BudgetGoals: undefined;
+  Explore: undefined;  // Add this line
 };
 
 export type NavigationProp = NativeStackNavigationProp<RootStackParamList>;

@@ -1,235 +1,177 @@
-import React, { useState, useEffect } from 'react';
-import {
-  StatusBar, 
-  StyleSheet, 
-  Text, 
-  View, 
-  FlatList, 
-  TouchableOpacity, 
-  PermissionsAndroid,
-  ActivityIndicator,
-  ListRenderItem
-} from 'react-native';
-import SmsAndroid from 'react-native-get-sms-android';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, PermissionsAndroid, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import SmsAndroid from 'react-native-get-sms-android';
 
-
-// Define the SMS message interface
-interface SmsMessage {
-  _id: string;
-  thread_id: string;
+type SMS = {
+  id: string;
   address: string;
-  person: string | null;
-  date: string;
-  date_sent: string;
-  protocol: number;
-  read: number;
-  status: number;
-  type: number;
   body: string;
-  service_center: string | null;
-}
+  date: string;
+  type: string;
+};
 
-// Define filter options interface for SMS queries
-interface SmsFilter {
-  box: 'inbox' | 'sent' | 'draft' | 'outbox' | 'failed' | 'queued';
-  read?: number;
-  _id?: string;
-  address?: string;
-  body?: string;
-}
+export default function ExploreScreen() {
+  const [messages, setMessages] = useState<SMS[]>([]);
+  const [hasPermission, setHasPermission] = useState(false);
 
-const App: React.FC = () => {
-  const [messages, setMessages] = useState<SmsMessage[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [hasPermission, setHasPermission] = useState<boolean>(false);
-
-  const requestReadSmsPermission = async (): Promise<boolean> => {
+  const requestReadSMSPermission = async () => {
     try {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.READ_SMS,
-        {
-          title: "SMS Read Permission",
-          message: "This app needs access to read your SMS messages",
-          buttonNeutral: "Ask Me Later",
-          buttonNegative: "Cancel",
-          buttonPositive: "OK"
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.READ_SMS,
+          {
+            title: 'SMS Permission',
+            message: 'Financial Copilot needs access to your SMS to analyze transactions.',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          }
+        );
+        setHasPermission(granted === PermissionsAndroid.RESULTS.GRANTED);
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          loadMessages();
         }
-      );
-      
-      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-        console.log("SMS permission granted");
-        setHasPermission(true);
-        return true;
-      } else {
-        console.log("SMS permission denied");
-        setHasPermission(false);
-        setLoading(false);
-        return false;
       }
     } catch (err) {
       console.warn(err);
-      setLoading(false);
-      return false;
     }
   };
 
-  const loadMessages = (): void => {
-    const filter: SmsFilter = {
-      box: 'inbox',
-      // You can add more filters as needed:
-      // read: 0, // 0 for unread SMS, 1 for read SMS
-      // _id: '1234', // SMS with specific _id
-      // address: '+1222333444', // SMS from specific address
-      // body: 'Hello', // SMS containing specific text
-    };
-
-    SmsAndroid.list(
-      JSON.stringify(filter),
-      (fail: string) => {
-        console.log('Failed to get SMS: ' + fail);
-        setLoading(false);
-      },
-      (count: number, smsList: string) => {
-        console.log('Count: ', count);
-        const arr: SmsMessage[] = JSON.parse(smsList);
-        setMessages(arr);
-        setLoading(false);
-      },
-    );
+  const loadMessages = () => {
+    if (Platform.OS === 'android') {
+      SmsAndroid.list(
+        JSON.stringify({
+          box: 'inbox',
+          bodyRegex: '(.*)(?:credited|debited|sent|received|payment|transaction)(.*)',
+        }),
+        (fail) => console.log('Failed with this error: ' + fail),
+        (count, smsList) => {
+          const arr = JSON.parse(smsList);
+          setMessages(arr);
+        },
+      );
+    }
   };
 
   useEffect(() => {
-    const initApp = async (): Promise<void> => {
-      const hasPermission = await requestReadSmsPermission();
-      if (hasPermission) {
-        loadMessages();
-      }
-    };
-    
-    initApp();
+    requestReadSMSPermission();
   }, []);
 
-  const formatDate = (timestamp: string): string => {
-    const date = new Date(parseInt(timestamp, 10));
-    return date.toLocaleString();
-  };
-
-  const renderItem: ListRenderItem<SmsMessage> = ({ item }) => (
-    <View style={styles.messageContainer}>
+  const renderItem = ({ item }: { item: SMS }) => (
+    <View style={styles.messageCard}>
       <View style={styles.messageHeader}>
+        <MaterialCommunityIcons name="bank" size={24} color="#007AFF" />
         <Text style={styles.sender}>{item.address}</Text>
-        <Text style={styles.timestamp}>{formatDate(item.date)}</Text>
       </View>
       <Text style={styles.messageBody}>{item.body}</Text>
+      <Text style={styles.messageDate}>
+        {new Date(parseInt(item.date)).toLocaleDateString()}
+      </Text>
     </View>
   );
 
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#0000ff" />
-        <Text style={styles.loadingText}>Loading messages...</Text>
-      </View>
-    );
-  }
-
-  if (!hasPermission) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.permissionText}>SMS permission denied</Text>
-        <TouchableOpacity
-          style={styles.permissionButton}
-          onPress={requestReadSmsPermission}
-        >
-          <Text style={styles.permissionButtonText}>Request Permission</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>SMS Messages</Text>
+        <Text style={styles.title}>SMS Transactions</Text>
       </View>
-      <FlatList
-        data={messages}
-        renderItem={renderItem}
-        keyExtractor={(item: SmsMessage) => item._id.toString()}
-        contentContainerStyle={styles.listContainer}
-      />
+
+      {!hasPermission ? (
+        <View style={styles.permissionContainer}>
+          <MaterialCommunityIcons name="message-alert" size={64} color="#007AFF" />
+          <Text style={styles.permissionText}>
+            We need permission to read your SMS messages to analyze transactions
+          </Text>
+          <TouchableOpacity
+            style={styles.permissionButton}
+            onPress={requestReadSMSPermission}
+          >
+            <Text style={styles.permissionButtonText}>Grant Permission</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={messages}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+        />
+      )}
     </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-  },
-  permissionText: {
-    fontSize: 18,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  permissionButton: {
-    backgroundColor: '#2196F3',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 5,
-  },
-  permissionButtonText: {
-    color: 'white',
-    fontSize: 16,
+    backgroundColor: '#f5f5f5',
   },
   header: {
     padding: 16,
-    backgroundColor: '#FFFFFF',
-    elevation: 4,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
-  headerTitle: {
+  title: {
     fontSize: 20,
     fontWeight: 'bold',
+    color: '#333',
   },
-  listContainer: {
+  list: {
     padding: 16,
+    gap: 16,
   },
-  messageContainer: {
-    backgroundColor: '#FFFFFF',
-    marginBottom: 12,
+  messageCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
     padding: 16,
-    borderRadius: 8,
+    gap: 8,
     elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   messageHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
+    alignItems: 'center',
+    gap: 8,
   },
   sender: {
-    fontWeight: 'bold',
     fontSize: 16,
-  },
-  timestamp: {
-    color: '#757575',
-    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
   },
   messageBody: {
     fontSize: 14,
-    lineHeight: 20,
+    color: '#666',
+  },
+  messageDate: {
+    fontSize: 12,
+    color: '#999',
+  },
+  permissionContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    gap: 16,
+  },
+  permissionText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+  },
+  permissionButton: {
+    backgroundColor: '#007AFF',
+    padding: 16,
+    borderRadius: 12,
+  },
+  permissionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
-
-export default App;
