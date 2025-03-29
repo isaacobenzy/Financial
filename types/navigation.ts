@@ -5,7 +5,7 @@ export type RootStackParamList = {
   Login: undefined;
   MainTabs: undefined;
   Settings: undefined;
-  Explore: undefined;
+  Transactions: undefined;
   ImportSMS: undefined;
   ImportPDF: undefined;
   BudgetGoals: undefined;

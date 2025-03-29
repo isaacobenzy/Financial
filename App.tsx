@@ -17,7 +17,6 @@ import SettingsScreen from "./screens/SettingsScreen";
 import BudgetGoalsScreen from "./screens/BudgetGoalsScreen";
 import ImportSMSScreen from "./screens/ImportSMSScreen";
 import LoginScreen from "./screens/LoginScreen";
-import ExploreScreen from './screens/ExploreScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -78,8 +77,6 @@ function App() {
             <Stack.Screen name="Onboarding" component={OnboardingScreen} />
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="MainTabs" component={MainTabs} />
-            <Stack.Screen name="Settings" component={SettingsScreen} />
-            <Stack.Screen name="Explore" component={ExploreScreen} />
           </Stack.Navigator>
         </NavigationContainer>
         <Toaster />

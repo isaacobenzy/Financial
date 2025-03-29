@@ -2,17 +2,11 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../types/navigation';
 import TransactionCard from '../components/TransactionCard';
 import BalanceHeader from '../components/BalanceHeader';
 import ImportButton from '../components/ImportButton';
 
-type HomeScreenProps = {
-  navigation: NativeStackNavigationProp<RootStackParamList>;
-};
-
-export default function HomeScreen({ navigation }: HomeScreenProps) {
+export default function HomeScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -24,17 +18,11 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
       
       <ScrollView style={styles.content}>
         <BalanceHeader />
-        <TouchableOpacity 
-          onPress={() => navigation.navigate('Explore')}
-          style={styles.importSmsButton}
-        >
-          <MaterialCommunityIcons name="message-text" size={24} color="#007AFF" />
-          <Text style={styles.importSmsButtonText}>Import SMS</Text>
-        </TouchableOpacity>
+        <ImportButton />
         
         <View style={styles.transactionsHeader}>
           <Text style={styles.sectionTitle}>Recent Transactions</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('MainTabs', { screen: 'Transactions' })}>
+          <TouchableOpacity onPress={() => navigation.navigate('Transactions')}>
             <Text style={styles.viewAll}>View All</Text>
           </TouchableOpacity>
         </View>
@@ -64,21 +52,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-  },
-  importSmsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    padding: 16,
-    marginHorizontal: 16,
-    marginVertical: 8,
-    borderRadius: 12,
-    gap: 8,
-  },
-  importSmsButtonText: {
-    fontSize: 16,
-    color: '#007AFF',
-    fontWeight: '600',
   },
   transactionsHeader: {
     flexDirection: 'row',
