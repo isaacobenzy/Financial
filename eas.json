@@ -8,27 +8,33 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk",
-        "gradleCommand": ":app:assembleDebug"
+        "gradleCommand": ":app:assembleDebug",
+        "kotlinVersion": "1.8.0"
       },
       "env": {
-        "ANDROID_SDK_ROOT": "C:\\Users\\obeng\\AppData\\Local\\Android\\Sdk"
+        "ANDROID_SDK_ROOT": "C:\\Users\\obeng\\AppData\\Local\\Android\\Sdk",
+        "ANDROID_HOME": "C:\\Users\\obeng\\AppData\\Local\\Android\\Sdk"
       }
     },
     "preview": {
       "distribution": "internal",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "kotlinVersion": "1.8.0"
       },
       "env": {
-        "ANDROID_SDK_ROOT": "C:\\Users\\obeng\\AppData\\Local\\Android\\Sdk"
+        "ANDROID_SDK_ROOT": "C:\\Users\\obeng\\AppData\\Local\\Android\\Sdk",
+        "ANDROID_HOME": "C:\\Users\\obeng\\AppData\\Local\\Android\\Sdk"
       }
     },
     "production": {
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "kotlinVersion": "1.8.0"
       },
       "env": {
-        "ANDROID_SDK_ROOT": "C:\\Users\\obeng\\AppData\\Local\\Android\\Sdk"
+        "ANDROID_SDK_ROOT": "C:\\Users\\obeng\\AppData\\Local\\Android\\Sdk",
+        "ANDROID_HOME": "C:\\Users\\obeng\\AppData\\Local\\Android\\Sdk"
       }
     }
   }
