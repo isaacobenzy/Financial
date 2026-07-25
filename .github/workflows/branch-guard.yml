@@ -1,0 +1,54 @@
+name: Branch Flow Guard
+
+# Encourages features → staging → main while still allowing PRs into any of those branches.
+on:
+  pull_request:
+    branches:
+      - features
+      - staging
+      - main
+
+jobs:
+  guard:
+    name: Validate promotion path
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check branch promotion rules
+        env:
+          BASE: ${{ github.base_ref }}
+          HEAD: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          echo "PR: $HEAD → $BASE"
+
+          # Allow PRs into features from any feature/* or hotfix/* branch.
+          # staging should come from features (or hotfix/*).
+          # main should come from staging only (release path).
+          case "$BASE" in
+            features)
+              echo "OK: target is features (feature integration branch)."
+              ;;
+            staging)
+              if [[ "$HEAD" == "features" || "$HEAD" == hotfix/* || "$HEAD" == feature/* ]]; then
+                echo "OK: staging accepts features / feature/* / hotfix/*."
+              else
+                echo "::warning::Preferred flow is features → staging. Current head is '$HEAD'."
+              fi
+              ;;
+            main)
+              if [[ "$HEAD" != "staging" ]]; then
+                echo "::error::main only accepts pull requests from staging (features → staging → main)."
+                echo "Open/merge into staging first, then PR staging → main."
+                exit 1
+              fi
+              echo "OK: staging → main."
+              ;;
+            *)
+              echo "OK: unrestricted target '$BASE'."
+              ;;
+          esac
