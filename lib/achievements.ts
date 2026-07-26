@@ -56,6 +56,16 @@ export async function recordActivity(): Promise<StreakState> {
     lastActiveDate: today,
   };
   await AsyncStorage.setItem(STREAK_KEY, JSON.stringify(next));
+
+  // User checked in — cancel pending evening streak OS alert
+  try {
+    const { cancelNotificationById } = await import('@/lib/pushNotifications');
+    const { NOTIFY_IDS } = await import('@/lib/notificationPolicy');
+    await cancelNotificationById(NOTIFY_IDS.streakDaily);
+  } catch {
+    // ignore
+  }
+
   return next;
 }
 

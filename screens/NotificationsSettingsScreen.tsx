@@ -19,7 +19,7 @@ import {
   sendActivityPush,
 } from '@/lib/pushNotifications';
 import { notificationService } from '@/lib/notificationStore';
-import { isExpoGo, supportsSystemNotifications } from '@/lib/runtime';
+import { isExpoGo, isWeb, supportsSystemNotifications } from '@/lib/runtime';
 import { haptics } from '@/lib/haptics';
 import {
   getLiveSectionPrefs,
@@ -71,12 +71,13 @@ export default function NotificationsSettingsScreen() {
   const [token, setToken] = useState<string | null>(getCachedExpoPushToken());
   const [busy, setBusy] = useState(false);
   const [livePrefs, setLivePrefs] = useState<LiveSectionPrefs>({
-    overview: true,
-    balance: true,
-    goals: true,
-    streak: true,
+    overview: false,
+    balance: false,
+    goals: false,
+    streak: false,
   });
   const expoGo = isExpoGo();
+  const onWeb = isWeb();
   const pushSupported = supportsSystemNotifications();
 
   useFocusEffect(
@@ -154,6 +155,15 @@ export default function NotificationsSettingsScreen() {
           Feel haptics, see in-app toasts, and hear OS push. Toggle what stays live on your lock
           screen.
         </Text>
+
+        {onWeb ? (
+          <View style={styles.banner}>
+            <Text style={styles.bannerText}>
+              Web preview shows in-app toasts only. OS push and lock-screen widgets need the Android
+              preview APK — share this link for a no-install try.
+            </Text>
+          </View>
+        ) : null}
 
         {expoGo ? (
           <View style={styles.banner}>

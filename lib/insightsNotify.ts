@@ -3,6 +3,7 @@ import { getImportedTransactions, type LedgerBalance } from '@/lib/ledgerStore';
 import { getGoals } from '@/lib/goalsStore';
 import { notifyUser, scheduleStreakReminder } from '@/lib/notify';
 import { refreshWidgetSnapshot } from '@/lib/widgetBridge';
+import { markNotifiedToday, shouldNotifyToday } from '@/lib/notificationPolicy';
 import type { Transaction } from '@/lib/financeContext';
 
 const MILESTONE_KEY = 'goal_milestones_sent_v1';
@@ -51,6 +52,7 @@ export async function afterImportInsights(params: {
   await refreshWidgetSnapshot();
   await checkGoalMilestones();
   await checkSpendAnomaly(imported);
+  // Re-evaluate evening streak reminder after import (does not fire immediately)
   await scheduleStreakReminder();
 }
 
@@ -88,8 +90,10 @@ export async function checkGoalMilestones(): Promise<void> {
   await AsyncStorage.setItem(MILESTONE_KEY, JSON.stringify(sent));
 }
 
-/** Simple grounded anomaly: food spend vs remaining transactions average. */
+/** Simple grounded anomaly: food spend vs remaining transactions average. Once per day. */
 async function checkSpendAnomaly(transactions: Transaction[]): Promise<void> {
+  if (!(await shouldNotifyToday('anomaly_food'))) return;
+
   const expenses = transactions.filter((t) => t.type === 'expense');
   if (expenses.length < 4) return;
 
@@ -109,12 +113,13 @@ async function checkSpendAnomaly(transactions: Transaction[]): Promise<void> {
       'anomaly',
       { data: { screen: 'assistant' } },
     );
+    await markNotifiedToday('anomaly_food');
   }
 }
 
+/** Home focus: refresh in-app widget data only — no streak OS spam. */
 export async function onAppOpenHygiene(): Promise<void> {
   await refreshWidgetSnapshot();
-  await scheduleStreakReminder();
 }
 
 /** Push when a goal is created, updated, nearing complete, or finished. */
@@ -148,15 +153,18 @@ export async function notifyGoalLifecycle(
   }
 
   if (action !== 'completed' && pct >= 80 && pct < 100) {
-    await notifyUser(
-      'Almost there',
-      `“${goal.name}” is at ${pct}% — a little more to finish.`,
-      'goal',
-      {
-        categoryId: 'goal_milestone',
-        data: { screen: 'goals', goalId: goal.id },
-      },
-    );
+    if (await shouldNotifyToday(`goal_almost_${goal.id}`)) {
+      await notifyUser(
+        'Almost there',
+        `“${goal.name}” is at ${pct}% — a little more to finish.`,
+        'goal',
+        {
+          categoryId: 'goal_milestone',
+          data: { screen: 'goals', goalId: goal.id },
+        },
+      );
+      await markNotifiedToday(`goal_almost_${goal.id}`);
+    }
   }
 
   await checkGoalMilestones();

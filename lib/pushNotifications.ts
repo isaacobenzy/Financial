@@ -17,6 +17,7 @@ type NotificationsModule = typeof import('expo-notifications');
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 const BRAND = '#1B4332';
+const LIVE_ID_PREFIX = 'fc-live-';
 
 let handlerConfigured = false;
 let channelsReady = false;
@@ -91,12 +92,12 @@ async function ensureAndroidChannels(Notifications: NotificationsModule) {
       {
         id: 'default',
         name: 'Financial Copilot',
-        importance: Notifications.AndroidImportance.MAX,
+        importance: Notifications.AndroidImportance.DEFAULT,
       },
       {
         id: 'ledger_live',
         name: 'Live ledger',
-        importance: Notifications.AndroidImportance.MAX,
+        importance: Notifications.AndroidImportance.DEFAULT,
       },
       {
         id: 'goals',
@@ -143,6 +144,13 @@ function channelForCategory(category: PushCategory): string {
   if (category === 'goal_alerts') return 'goals';
   if (category === 'general' || category === 'security') return 'default';
   return 'activity';
+}
+
+function androidPriorityFor(category: PushCategory) {
+  if (category === 'goal_alerts' || category === 'streak_alerts' || category === 'import_alerts') {
+    return 'HIGH' as const;
+  }
+  return 'DEFAULT' as const;
 }
 
 function allowCategory(category: PushCategory): boolean {
@@ -227,15 +235,56 @@ async function fallbackToast(title: string, body: string) {
   notificationService.info(body, title);
 }
 
+export async function cancelNotificationById(identifier: string): Promise<void> {
+  const Notifications = await getNotifications();
+  if (!Notifications) return;
+  try {
+    await Notifications.cancelScheduledNotificationAsync(identifier).catch(() => undefined);
+    await Notifications.dismissNotificationAsync(identifier).catch(() => undefined);
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Dismiss presented OS alerts that are not opted-in live sticky widgets.
+ * Keeps `fc-live-*` stickies when the user enabled them.
+ */
+export async function dismissNonLiveTrayAlerts(): Promise<void> {
+  const Notifications = await getNotifications();
+  if (!Notifications) return;
+  try {
+    const presented = await Notifications.getPresentedNotificationsAsync();
+    await Promise.all(
+      presented
+        .filter((n) => {
+          const id = n.request.identifier ?? '';
+          const data = n.request.content.data as Record<string, unknown> | undefined;
+          if (id.startsWith(LIVE_ID_PREFIX)) return false;
+          if (data?.kind === 'live') return false;
+          return true;
+        })
+        .map((n) =>
+          Notifications.dismissNotificationAsync(n.request.identifier).catch(() => undefined),
+        ),
+    );
+  } catch {
+    // ignore
+  }
+}
+
 /**
  * Instant local notification (branded small + large icons in a native build).
  * Set `mirrorRemote: true` only when you also need Expo Push delivery off-device.
+ * Pass `identifier` to replace instead of stacking; `triggerDate` for deferred local schedule.
  */
 export async function sendActivityPush(params: {
   title: string;
   body: string;
   category?: PushCategory;
   data?: Record<string, unknown>;
+  identifier?: string;
+  triggerDate?: Date;
   skipToastFallback?: boolean;
   mirrorRemote?: boolean;
 }): Promise<void> {
@@ -251,13 +300,32 @@ export async function sendActivityPush(params: {
   }
 
   try {
-    // Only wait for channels on first use (warmed at boot)
     if (!channelsReady) {
       await ensureAndroidChannels(Notifications);
     }
 
-    // Local schedule — no network. Icon/color come from the native build config.
+    const identifier = params.identifier;
+    if (identifier) {
+      await Notifications.cancelScheduledNotificationAsync(identifier).catch(() => undefined);
+      await Notifications.dismissNotificationAsync(identifier).catch(() => undefined);
+    }
+
+    const priority =
+      Platform.OS === 'android'
+        ? androidPriorityFor(category) === 'HIGH'
+          ? Notifications.AndroidNotificationPriority.HIGH
+          : Notifications.AndroidNotificationPriority.DEFAULT
+        : undefined;
+
+    const trigger = params.triggerDate
+      ? ({
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: params.triggerDate,
+        } as const)
+      : null;
+
     void Notifications.scheduleNotificationAsync({
+      ...(identifier ? { identifier } : {}),
       content: {
         title: params.title,
         body: params.body,
@@ -269,18 +337,18 @@ export async function sendActivityPush(params: {
               color: BRAND,
               sticky: false,
               autoDismiss: true,
-              priority: Notifications.AndroidNotificationPriority.MAX,
+              priority,
             }
           : {}),
       },
-      trigger: null,
+      trigger,
     });
   } catch {
     if (!params.skipToastFallback) await fallbackToast(params.title, params.body);
     return;
   }
 
-  if (params.mirrorRemote) {
+  if (params.mirrorRemote && !params.triggerDate) {
     sendViaExpoPushServiceInBackground({
       title: params.title,
       body: params.body,
@@ -300,6 +368,7 @@ export async function sendGoalPush(params: {
     title: params.title,
     body: params.body,
     category: 'goal_alerts',
+    identifier: params.goalId ? `fc-goal-${params.goalId}` : undefined,
     data: {
       goalId: params.goalId,
       href: '/(tabs)/goals',
@@ -316,6 +385,7 @@ export async function sendLedgerLivePush(params: {
     title: params.title,
     body: params.body,
     category: 'ledger_live',
+    identifier: 'fc-activity-ledger',
     data: { href: '/(tabs)', screen: 'home' },
   });
 }
@@ -332,6 +402,12 @@ export async function setupNotificationResponseListeners(
   const received = Notifications.addNotificationReceivedListener(() => undefined);
 
   const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+    const id = response.notification.request.identifier;
+    if (id) {
+      void Notifications.dismissNotificationAsync(id).catch(() => undefined);
+    }
+    void Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
+
     const data = response.notification.request.content.data as Record<string, unknown>;
     const href = typeof data?.href === 'string' ? data.href : null;
     if (href) {

@@ -13,6 +13,7 @@ import BioSessionGuard from '@/components/BioSessionGuard';
 import NotificationActions from '@/components/NotificationActions';
 import NotificationStack from '@/components/NotificationStack';
 import AnimatedSplash from '@/components/AnimatedSplash';
+import WebPreviewBanner from '@/components/WebPreviewBanner';
 import { theme } from '@/constants/theme';
 
 export { ErrorBoundary } from 'expo-router';
@@ -71,26 +72,29 @@ function RootLayoutNav() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.colors.paper }}>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: theme.colors.paper },
-          }}
-        >
-          <Stack.Screen name="onboarding" />
-          <Stack.Screen name="login" />
-          <Stack.Screen name="unlock" />
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="assistant" />
-          <Stack.Screen name="settings" />
-          <Stack.Screen name="notifications-settings" />
-          <Stack.Screen name="transactions" />
-          <Stack.Screen name="explore" />
-          <Stack.Screen name="import-sms" />
-          <Stack.Screen name="paste-sms" />
-          <Stack.Screen name="import-pdf" />
-          <Stack.Screen name="budget-goals" />
-        </Stack>
+        <View style={{ flex: 1 }}>
+          <WebPreviewBanner />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: theme.colors.paper },
+            }}
+          >
+            <Stack.Screen name="onboarding" />
+            <Stack.Screen name="login" />
+            <Stack.Screen name="unlock" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="assistant" />
+            <Stack.Screen name="settings" />
+            <Stack.Screen name="notifications-settings" />
+            <Stack.Screen name="transactions" />
+            <Stack.Screen name="explore" />
+            <Stack.Screen name="import-sms" />
+            <Stack.Screen name="paste-sms" />
+            <Stack.Screen name="import-pdf" />
+            <Stack.Screen name="budget-goals" />
+          </Stack>
+        </View>
         <BioSessionGuard />
         <NotificationActions />
         {/* Global toast stack above navigation */}

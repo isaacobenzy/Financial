@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -15,6 +15,7 @@ import { theme } from '@/constants/theme';
 import { onAppOpenHygiene } from '@/lib/insightsNotify';
 import { getSession, type UserSession } from '@/lib/session';
 import { getLedgerBalance } from '@/lib/ledgerStore';
+import { primarySmsImportHref, primarySmsImportLabel, supportsNativeSmsInbox } from '@/lib/runtime';
 
 const STALE_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -87,16 +88,14 @@ export default function HomeScreen() {
             <View style={styles.importRow}>
               <TouchableOpacity
                 style={styles.importPrimary}
-                onPress={() => go(Platform.OS === 'ios' ? '/paste-sms' : '/import-sms')}
+                onPress={() => go(primarySmsImportHref())}
               >
                 <MaterialCommunityIcons
-                  name={Platform.OS === 'ios' ? 'content-paste' : 'message-text-outline'}
+                  name={supportsNativeSmsInbox() ? 'message-text-outline' : 'content-paste'}
                   size={18}
                   color={theme.colors.white}
                 />
-                <Text style={styles.importPrimaryText}>
-                  {Platform.OS === 'ios' ? 'Paste SMS' : 'Import SMS'}
-                </Text>
+                <Text style={styles.importPrimaryText}>{primarySmsImportLabel()}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.importSecondary} onPress={() => go('/import-pdf')}>
                 <MaterialCommunityIcons name="file-pdf-box" size={18} color={theme.colors.cedar} />
@@ -119,7 +118,7 @@ export default function HomeScreen() {
           <View style={styles.importPills}>
             <TouchableOpacity
               style={styles.pill}
-              onPress={() => go(Platform.OS === 'ios' ? '/paste-sms' : '/import-sms')}
+              onPress={() => go(primarySmsImportHref())}
             >
               <MaterialCommunityIcons name="plus" size={14} color={theme.colors.cedar} />
               <Text style={styles.pillText}>Import</Text>
