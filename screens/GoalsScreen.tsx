@@ -12,9 +12,10 @@ import {
   Platform,
   Keyboard,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
+import { tabContentPaddingBottom } from '@/constants/layout';
 import { theme } from '@/constants/theme';
 import {
   addGoalProgress,
@@ -59,6 +60,7 @@ function iconName(icon: string): keyof typeof MaterialCommunityIcons.glyphMap {
 }
 
 export default function GoalsScreen() {
+  const insets = useSafeAreaInsets();
   const [goals, setGoals] = useState<FinancialGoal[]>([]);
   const [period, setPeriod] = useState<'monthly' | 'yearly'>('monthly');
   const [editing, setEditing] = useState<FinancialGoal | null>(null);
@@ -226,7 +228,10 @@ export default function GoalsScreen() {
         ))}
       </View>
 
-      <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.list, { paddingBottom: tabContentPaddingBottom(insets.bottom) }]}
+        showsVerticalScrollIndicator={false}
+      >
         {active.map((goal) => {
           const pct = goalProgressPct(goal);
           const over = goal.kind === 'budget' && goal.current > goal.target;
@@ -471,7 +476,7 @@ const styles = StyleSheet.create({
   },
   periodText: { fontWeight: '700', color: theme.colors.muted },
   periodTextActive: { color: theme.colors.white },
-  list: { padding: 16, paddingBottom: 120, gap: 12 },
+  list: { padding: 16, gap: 12 },
   sectionLabel: {
     marginTop: 8,
     fontSize: 12,
