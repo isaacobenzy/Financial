@@ -1,5 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import { isWeb } from '@/lib/runtime';
 
 const BIO_ENABLED_KEY = 'biometric_unlock_v1';
 const UNLOCK_SESSION_KEY = 'biometric_unlocked_at_v1';
@@ -14,6 +16,50 @@ async function getLocalAuth(): Promise<LocalAuthModule | null> {
     return await import('expo-local-authentication');
   } catch {
     return null;
+  }
+}
+
+/** SecureStore is a no-op stub on web — fall back to AsyncStorage so login works. */
+async function storageGet(key: string): Promise<string | null> {
+  if (isWeb()) {
+    try {
+      return await AsyncStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+  try {
+    return await SecureStore.getItemAsync(key);
+  } catch {
+    try {
+      return await AsyncStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+}
+
+async function storageSet(key: string, value: string): Promise<void> {
+  if (isWeb()) {
+    await AsyncStorage.setItem(key, value);
+    return;
+  }
+  try {
+    await SecureStore.setItemAsync(key, value);
+  } catch {
+    await AsyncStorage.setItem(key, value);
+  }
+}
+
+async function storageDelete(key: string): Promise<void> {
+  if (isWeb()) {
+    await AsyncStorage.removeItem(key);
+    return;
+  }
+  try {
+    await SecureStore.deleteItemAsync(key);
+  } catch {
+    await AsyncStorage.removeItem(key).catch(() => undefined);
   }
 }
 
@@ -48,7 +94,7 @@ export async function getBiometricLabel(): Promise<string> {
 
 export async function isBiometricUnlockEnabled(): Promise<boolean> {
   try {
-    const value = await SecureStore.getItemAsync(BIO_ENABLED_KEY);
+    const value = await storageGet(BIO_ENABLED_KEY);
     return value === '1';
   } catch {
     return false;
@@ -57,16 +103,16 @@ export async function isBiometricUnlockEnabled(): Promise<boolean> {
 
 export async function setBiometricUnlockEnabled(enabled: boolean): Promise<void> {
   if (enabled) {
-    await SecureStore.setItemAsync(BIO_ENABLED_KEY, '1');
+    await storageSet(BIO_ENABLED_KEY, '1');
   } else {
-    await SecureStore.deleteItemAsync(BIO_ENABLED_KEY);
-    await SecureStore.deleteItemAsync(UNLOCK_SESSION_KEY);
+    await storageDelete(BIO_ENABLED_KEY);
+    await storageDelete(UNLOCK_SESSION_KEY);
   }
 }
 
 export async function isAppUnlocked(): Promise<boolean> {
   try {
-    const raw = await SecureStore.getItemAsync(UNLOCK_SESSION_KEY);
+    const raw = await storageGet(UNLOCK_SESSION_KEY);
     if (!raw) return false;
     const at = Number(raw);
     if (!Number.isFinite(at)) return false;
@@ -77,12 +123,12 @@ export async function isAppUnlocked(): Promise<boolean> {
 }
 
 export async function markAppUnlocked(): Promise<void> {
-  await SecureStore.setItemAsync(UNLOCK_SESSION_KEY, String(Date.now()));
+  await storageSet(UNLOCK_SESSION_KEY, String(Date.now()));
 }
 
 export async function clearAppUnlock(): Promise<void> {
   try {
-    await SecureStore.deleteItemAsync(UNLOCK_SESSION_KEY);
+    await storageDelete(UNLOCK_SESSION_KEY);
   } catch {
     // ignore
   }

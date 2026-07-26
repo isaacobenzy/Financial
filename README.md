@@ -206,17 +206,29 @@ After the APK is installed, `eas update --channel preview` ships new JS without 
 
 EAS Workflows (repo): `.eas/workflows/android-preview-build.yml`, `publish-preview-update.yml`.
 
-### 3. Web preview URL (EAS Hosting)
+### 3. Web preview URL (EAS Hosting) — share without installing
+
+Anyone can open the app in a browser (no APK). SMS inbox / OS push / biometrics still need the Android build.
 
 ```bash
-npm run deploy:web
+# Stable shareable preview (recommended for teammates / demos)
+pnpm deploy:web:preview
+# → https://<your-subdomain>--preview.expo.app/
+
+# Production alias
+pnpm deploy:web:prod
+# → https://<your-subdomain>.expo.app/
 ```
 
-You get a URL like `https://your-app.expo.app/` ([EAS Hosting](https://docs.expo.dev/eas/hosting/get-started/)). GitHub: **EAS Web Hosting** workflow.
+First deploy prompts you to pick a **preview subdomain** (globally unique). After that, each `deploy:web:preview` updates the same shareable link.
+
+GitHub Actions: **EAS Web Hosting** deploys `preview` on `staging` / PRs and `production` on `main` (needs `EXPO_TOKEN` secret).
+
+Demo login on web: `demo@financialcopilot.com` / `demo123`.
 
 ### Expo Go limits
 
-Expo Go cannot do real SMS inbox, full push notifications, or lock-screen live status. Use the Android preview APK for those. In Expo Go you still get toasts + Paste SMS / sample import.
+Expo Go cannot do real SMS inbox, full push notifications, or lock-screen live status. Use the Android preview APK for those. In Expo Go you still get toasts + Paste SMS / sample import. For a no-install demo, prefer the **web preview URL** above.
 
 ---
 

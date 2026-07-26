@@ -209,7 +209,9 @@ export default function ExploreScreen() {
           <Text style={styles.permissionText}>
             {Platform.OS === 'android'
               ? 'Allow SMS access, then we import MoMo/bank alerts into your ledger and replace sample data with real rows.'
-              : 'iPhone cannot share the SMS inbox. Paste an alert, or try sample data below.'}
+              : Platform.OS === 'web'
+                ? 'Browsers cannot read your SMS inbox. Paste a MoMo/bank alert, or try sample data below. Use the Android APK for live inbox import.'
+                : 'This device cannot share the SMS inbox. Paste an alert, or try sample data below.'}
           </Text>
 
           {Platform.OS === 'android' ? (
