@@ -40,6 +40,16 @@
         "android.permission.USE_FINGERPRINT",
         "android.permission.INTERNET",
         "android.permission.VIBRATE",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.READ_SMS",
+        "android.permission.RECEIVE_SMS",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.INTERNET",
+        "android.permission.VIBRATE",
         "android.permission.SCHEDULE_EXACT_ALARM"
       ],
       "adaptiveIcon": {
@@ -102,6 +112,12 @@
         "projectId": "7659da44-7576-4f69-a623-cc9a77d973f6"
       }
     },
-    "owner": "isaacobengz"
+    "owner": "isaacobengz",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/7659da44-7576-4f69-a623-cc9a77d973f6"
+    }
   }
 }
