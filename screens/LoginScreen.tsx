@@ -3,14 +3,16 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-nativ
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { toast } from '@/lib/toast';
 import { theme } from '@/constants/theme';
 import NaviiAvatar from '@/components/NaviiAvatar';
+import PrimaryButton from '@/components/PrimaryButton';
 import { seedFromEmail } from '@/lib/navii';
 import { getSession, saveSession } from '@/lib/session';
 import { authenticateAccount, registerAccount } from '@/lib/accounts';
-import { haptic } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
+import { notificationService } from '@/lib/notificationStore';
 import { notifyAuthEvent } from '@/lib/liveActivity';
+import { emitActivityPulse } from '@/lib/liveActivityFeed';
 import {
   authenticateBiometric,
   getBiometricLabel,
@@ -51,15 +53,20 @@ export default function LoginScreen() {
 
   const enterApp = async (displayName?: string) => {
     await markAppUnlocked();
-    await haptic('success', 'login');
     await notifyAuthEvent('login', displayName);
+    void emitActivityPulse({
+      kind: 'ledger',
+      title: 'Signed in',
+      body: 'Live ledger widgets are ready.',
+      href: '/(tabs)',
+    });
     router.replace('/(tabs)');
   };
 
   const handleAuth = async () => {
     const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedEmail || !password) {
-      toast.error('Enter email and password');
+      notificationService.error('Enter email and password');
       return;
     }
 
@@ -80,7 +87,10 @@ export default function LoginScreen() {
         return;
       }
 
-      toast.error('Check your email and password, or create an account', 'Invalid login');
+      notificationService.error(
+        'Check your email and password, or create an account',
+        'Invalid login',
+      );
       return;
     }
 
@@ -90,31 +100,31 @@ export default function LoginScreen() {
       name: name.trim() || trimmedEmail.split('@')[0] || 'User',
     });
     if (!result.ok) {
-      toast.error(result.error);
+      notificationService.error(result.error);
       return;
     }
     const account = await authenticateAccount(trimmedEmail, password);
     if (!account) {
-      toast.error('Account created but sign-in failed — try logging in');
+      notificationService.error('Account created but sign-in failed — try logging in');
       setIsLogin(true);
       return;
     }
     await saveSession(account.email, account.name, account.phone);
-    toast.success('Account created');
+    notificationService.success('Account created');
     await enterApp(account.name);
   };
 
   const handleBiometricLogin = async () => {
     const session = await getSession();
     if (!session) {
-      toast.error('Sign in with your password once first');
+      notificationService.error('Sign in with your password once first');
       return;
     }
     const ok = await authenticateBiometric(`Sign in with ${bioLabel}`);
     if (ok) {
       await enterApp(session.name);
     } else {
-      toast.error('Biometric unlock cancelled');
+      notificationService.error('Biometric unlock cancelled');
     }
   };
 
@@ -166,25 +176,29 @@ export default function LoginScreen() {
           />
         </View>
 
-        <TouchableOpacity style={styles.authButton} onPress={handleAuth}>
-          <MaterialCommunityIcons name="login" size={18} color={theme.colors.white} />
-          <Text style={styles.authButtonText}>{isLogin ? 'Sign in' : 'Create account'}</Text>
-        </TouchableOpacity>
+        <PrimaryButton
+          label={isLogin ? 'Sign in' : 'Create account'}
+          icon="login"
+          onPress={handleAuth}
+        />
 
         {bioReady ? (
-          <TouchableOpacity style={styles.bioButton} onPress={handleBiometricLogin}>
-            <MaterialCommunityIcons name="fingerprint" size={20} color={theme.colors.cedarDeep} />
-            <Text style={styles.bioButtonText}>Use {bioLabel}</Text>
-          </TouchableOpacity>
+          <PrimaryButton
+            label={`Use ${bioLabel}`}
+            icon="fingerprint"
+            variant="secondary"
+            onPress={handleBiometricLogin}
+          />
         ) : null}
 
         <TouchableOpacity
           style={styles.demoButton}
-          onPress={() => {
+          onPress={async () => {
+            await haptics.select();
             setIsLogin(true);
             setEmail(DEMO_CREDENTIALS.email);
             setPassword(DEMO_CREDENTIALS.password);
-            toast.info('Demo email and password filled in', 'Ready to go');
+            notificationService.info('Demo email and password filled in', 'Ready to go');
           }}
         >
           <MaterialCommunityIcons name="account-check-outline" size={18} color={theme.colors.cedarDeep} />
@@ -243,36 +257,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     fontSize: 16,
     color: theme.colors.ink,
-  },
-  authButton: {
-    backgroundColor: theme.colors.cedar,
-    padding: 16,
-    borderRadius: theme.radius.md,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  authButtonText: {
-    color: theme.colors.white,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  bioButton: {
-    backgroundColor: theme.colors.white,
-    borderWidth: 1,
-    borderColor: theme.colors.cedar,
-    padding: 16,
-    borderRadius: theme.radius.md,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  bioButtonText: {
-    color: theme.colors.cedarDeep,
-    fontSize: 15,
-    fontWeight: '700',
   },
   demoButton: {
     backgroundColor: theme.colors.sage,

@@ -237,6 +237,20 @@ Expo Go cannot do real SMS inbox, full push notifications, or lock-screen live s
 - **Android lock-screen live status**: sticky branded notification (`lib/liveActivity.ts`) with the app notification icon — updates on sign-in, goals, and balance refresh. Clear on sign-out.
 - **Native iOS Live Activities / home widgets** via `expo-widgets` need **Expo SDK 56+** and a native extension; SDK 54 uses the Android live notification + in-app widget.
 
+## Sensory feedback (BetLive-style)
+
+Three layers — feel / see / hear:
+
+| Layer | Module | Notes |
+|-------|--------|--------|
+| Haptics | `lib/haptics.ts`, `hooks/useHaptics.ts` | Semantic: `buttonPress`, `select`, `success`… never throws |
+| Toasts | `lib/notificationStore.ts` → `notificationService` + `NotificationStack` | Toast always pairs matching haptic |
+| Push | `lib/pushNotifications.ts` | Settings gate → Expo Push → local → toast fallback |
+
+Deep links use `data.href` (or `goalId` / `screen`). Settings UI: `/notifications-settings`.
+
+**Expo Go:** Android SDK 53+ cannot use remote push — use `pnpm build:android:preview`. Toasts + haptics still work.
+
 ## Splash (animated)
 
 - Native splash via `expo-splash-screen` plugin + `SplashScreen.setOptions({ fade: true })` ([docs](https://docs.expo.dev/versions/latest/sdk/splash-screen/)).

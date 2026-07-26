@@ -9,9 +9,9 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
-import ToastHost from '@/components/ToastHost';
 import BioSessionGuard from '@/components/BioSessionGuard';
 import NotificationActions from '@/components/NotificationActions';
+import NotificationStack from '@/components/NotificationStack';
 import AnimatedSplash from '@/components/AnimatedSplash';
 import { theme } from '@/constants/theme';
 
@@ -21,10 +21,8 @@ export const unstable_settings = {
   initialRouteName: 'onboarding',
 };
 
-// Keep native splash until fonts + branded animation are ready
 SplashScreen.preventAutoHideAsync();
 
-// Fade the native splash (iOS / supported platforms)
 try {
   SplashScreen.setOptions({
     duration: 900,
@@ -85,6 +83,7 @@ function RootLayoutNav() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="assistant" />
           <Stack.Screen name="settings" />
+          <Stack.Screen name="notifications-settings" />
           <Stack.Screen name="transactions" />
           <Stack.Screen name="explore" />
           <Stack.Screen name="import-sms" />
@@ -94,7 +93,8 @@ function RootLayoutNav() {
         </Stack>
         <BioSessionGuard />
         <NotificationActions />
-        <ToastHost />
+        {/* Global toast stack above navigation */}
+        <NotificationStack />
       </ThemeProvider>
     </GestureHandlerRootView>
   );

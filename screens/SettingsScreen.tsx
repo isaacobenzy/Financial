@@ -7,7 +7,6 @@ import {
   ScrollView,
   ActivityIndicator,
   Switch,
-  Linking,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,7 +18,7 @@ import {
   requestPermission,
   type PermissionStatus,
 } from '@/lib/permissions';
-import { toast } from '@/lib/toast';
+import { notificationService } from '@/lib/notificationStore';
 import { theme } from '@/constants/theme';
 import NaviiAvatar from '@/components/NaviiAvatar';
 import { clearSession, getSession, type UserSession } from '@/lib/session';
@@ -31,12 +30,7 @@ import {
   enableBiometricUnlock,
   setBiometricUnlockEnabled,
 } from '@/lib/biometrics';
-import {
-  haptic,
-  HAPTIC_GUIDE,
-  isHapticsEnabled,
-  setHapticsEnabled,
-} from '@/lib/haptics';
+import { haptics, isHapticsEnabled, setHapticsEnabled } from '@/lib/haptics';
 import {
   getLiveSectionPrefs,
   notifyAuthEvent,
@@ -45,11 +39,6 @@ import {
   type LiveSection,
   type LiveSectionPrefs,
 } from '@/lib/liveActivity';
-import {
-  getStoredPushToken,
-  registerForPushNotificationsAsync,
-  sendTestPushNotification,
-} from '@/lib/pushRegister';
 import { supportsSystemNotifications } from '@/lib/runtime';
 import ProfileEditModal from '@/components/ProfileEditModal';
 
@@ -72,8 +61,6 @@ export default function SettingsScreen() {
   const [bioLabel, setBioLabel] = useState('Biometrics');
   const [hapticsOn, setHapticsOn] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [pushToken, setPushToken] = useState<string | null>(null);
-  const [pushBusy, setPushBusy] = useState(false);
   const [livePrefs, setLivePrefs] = useState<LiveSectionPrefs>({
     overview: true,
     balance: true,
@@ -90,7 +77,6 @@ export default function SettingsScreen() {
     setBioLabel(await getBiometricLabel());
     setHapticsOn(await isHapticsEnabled());
     setLivePrefs(await getLiveSectionPrefs());
-    setPushToken(await getStoredPushToken());
   }, []);
 
   useFocusEffect(
@@ -104,7 +90,7 @@ export default function SettingsScreen() {
     try {
       const next = await requestAllAppPermissions();
       setPermissions(next);
-      toast.success('Permissions updated for this device');
+      notificationService.success('Permissions updated for this device');
     } finally {
       setLoadingPerms(false);
     }
@@ -115,15 +101,15 @@ export default function SettingsScreen() {
       const ok = await enableBiometricUnlock();
       setBioOn(ok);
       if (ok) {
-        toast.success(`${bioLabel} unlock enabled`);
+        notificationService.success(`${bioLabel} unlock enabled`);
       } else {
-        toast.error('Could not enable biometrics');
+        notificationService.error('Could not enable biometrics');
       }
     } else {
       await setBiometricUnlockEnabled(false);
       await clearAppUnlock();
       setBioOn(false);
-      toast.info(`${bioLabel} unlock turned off`);
+      notificationService.info(`${bioLabel} unlock turned off`);
     }
     setPermissions(await getPermissionStatuses());
   };
@@ -132,56 +118,22 @@ export default function SettingsScreen() {
     await setHapticsEnabled(value);
     setHapticsOn(value);
     if (value) {
-      await haptic('success', 'preview');
-      toast.success('Haptics on for login, tabs, AI reply, and goals');
+      await haptics.success();
+      notificationService.success('Haptics paired with toasts');
     } else {
-      toast.info('Haptic feedback turned off');
-    }
-  };
-
-  const registerPush = async () => {
-    if (!pushSupported) {
-      toast.info('Use an Android preview / development build for push', 'Expo Go limit');
-      return;
-    }
-    setPushBusy(true);
-    try {
-      const token = await registerForPushNotificationsAsync();
-      setPushToken(token);
-      if (token) {
-        toast.success('Push token ready — copy it into expo.dev/notifications');
-      } else {
-        toast.error('Permission denied or projectId missing');
-      }
-    } finally {
-      setPushBusy(false);
-    }
-  };
-
-  const sendTestPush = async () => {
-    if (!pushToken) {
-      await registerPush();
-      return;
-    }
-    setPushBusy(true);
-    try {
-      const ok = await sendTestPushNotification(pushToken);
-      if (ok) toast.success('Test push sent — check the shade / lock screen');
-      else toast.error('Could not send test push');
-    } finally {
-      setPushBusy(false);
+      notificationService.info('Haptic feedback turned off');
     }
   };
 
   const toggleLive = async (section: LiveSection, value: boolean) => {
     if (!pushSupported) {
-      toast.info('Live lock-screen widgets need a development build');
+      notificationService.info('Live lock-screen widgets need a development build');
       return;
     }
     const next = await setLiveSectionPref(section, value);
     setLivePrefs(next);
     if (value) await publishLiveSections();
-    toast.info(value ? `${section} widget on` : `${section} widget off`);
+    notificationService.info(value ? `${section} widget on` : `${section} widget off`);
   };
 
   const logout = async () => {
@@ -197,7 +149,7 @@ export default function SettingsScreen() {
       return;
     }
     if (!perm.available) {
-      toast.info(perm.description);
+      notificationService.info(perm.description);
       return;
     }
     if (perm.granted) {
@@ -207,9 +159,9 @@ export default function SettingsScreen() {
     const ok = await requestPermission(perm.id);
     setPermissions(await getPermissionStatuses());
     if (ok) {
-      toast.success(`${perm.label} is on`, 'Permission granted');
+      notificationService.success(`${perm.label} is on`, 'Permission granted');
     } else {
-      toast.error(`${perm.label} was denied`, 'Permission needed');
+      notificationService.error(`${perm.label} was denied`, 'Permission needed');
     }
   };
 
@@ -276,17 +228,27 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Haptic feedback</Text>
+          <Text style={styles.sectionTitle}>Feedback & alerts</Text>
           <Text style={styles.sectionDescription}>
-            Only on login success, tab taps, AI replies, and goals. Turn off anytime.
+            Haptics + toasts + push (BetLive-style). Manage categories, test push, and Expo Go limits.
           </Text>
+          <TouchableOpacity
+            style={styles.linkRow}
+            onPress={() => router.push('/notifications-settings')}
+          >
+            <View style={styles.linkLeft}>
+              <MaterialCommunityIcons name="bell-ring-outline" size={20} color={theme.colors.cedar} />
+              <Text style={styles.linkText}>Notification settings</Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={22} color={theme.colors.muted} />
+          </TouchableOpacity>
           <View style={styles.bioRow}>
             <View style={styles.permIcon}>
               <MaterialCommunityIcons name="vibrate" size={22} color={theme.colors.cedar} />
             </View>
             <View style={styles.permCopy}>
               <Text style={styles.permLabel}>Enable haptics</Text>
-              <Text style={styles.permDesc}>Login · Tabs · AI reply · Goals</Text>
+              <Text style={styles.permDesc}>Paired with toasts · semantic feedback</Text>
             </View>
             <Switch
               value={hapticsOn}
@@ -295,72 +257,6 @@ export default function SettingsScreen() {
               thumbColor={theme.colors.white}
             />
           </View>
-          {HAPTIC_GUIDE.map((row) => (
-            <View key={row.when} style={styles.hapticRow}>
-              <Text style={styles.hapticWhen}>{row.when}</Text>
-              <Text style={styles.hapticKind}>{row.kind}</Text>
-            </View>
-          ))}
-          <TouchableOpacity
-            style={styles.secondaryBtn}
-            onPress={async () => {
-              if (!hapticsOn) {
-                toast.info('Turn on haptics first');
-                return;
-              }
-              await haptic('success', 'preview');
-              toast.success('That was a success pulse');
-            }}
-          >
-            <Text style={styles.secondaryBtnText}>Try feedback</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Push notifications</Text>
-          <Text style={styles.sectionDescription}>
-            Branded with your app notification icon. Register a token, then test from Settings or{' '}
-            expo.dev/notifications. Android remote push also needs FCM credentials on EAS.
-          </Text>
-          {!pushSupported ? (
-            <Text style={styles.permDesc}>
-              Expo Go cannot register Expo push tokens on Android SDK 53+. Install a preview APK.
-            </Text>
-          ) : (
-            <>
-              <Text style={styles.tokenLabel}>Expo push token</Text>
-              <Text style={styles.tokenValue} selectable>
-                {pushToken || 'Not registered yet'}
-              </Text>
-              <TouchableOpacity style={styles.primaryBtn} onPress={registerPush} disabled={pushBusy}>
-                {pushBusy ? (
-                  <ActivityIndicator color={theme.colors.white} />
-                ) : (
-                  <>
-                    <MaterialCommunityIcons name="bell-badge-outline" size={18} color={theme.colors.white} />
-                    <Text style={styles.primaryBtnText}>Register for push</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.secondaryBtn} onPress={sendTestPush} disabled={pushBusy}>
-                <Text style={styles.secondaryBtnText}>Send test push to this device</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.secondaryBtn}
-                onPress={() => Linking.openURL('https://expo.dev/notifications')}
-              >
-                <Text style={styles.secondaryBtnText}>Open Expo push tool</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Live lock-screen widgets</Text>
-          <Text style={styles.sectionDescription}>
-            Sticky branded notifications for each section (Android lock screen / notification shade).
-            Toggle what stays visible.
-          </Text>
           {LIVE_ROWS.map((row) => (
             <View key={row.key} style={styles.bioRow}>
               <View style={styles.permIcon}>
@@ -394,7 +290,7 @@ export default function SettingsScreen() {
             style={styles.secondaryBtn}
             onPress={async () => {
               await publishLiveSections();
-              toast.success('Live widgets refreshed');
+              notificationService.success('Live widgets refreshed');
             }}
           >
             <Text style={styles.secondaryBtnText}>Refresh live widgets now</Text>

@@ -16,9 +16,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { theme } from '@/constants/theme';
 import { askOpenRouter, type ChatMessage } from '@/lib/openrouter';
-import { toast } from '@/lib/toast';
-import { haptic } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { recordActivity } from '@/lib/achievements';
+import { notificationService } from '@/lib/notificationStore';
 
 const DEFAULT_PROMPTS = [
   'How much did I spend recently?',
@@ -88,7 +88,7 @@ export default function AssistantScreen() {
       const prior = history.slice(0, -1);
       const reply = await askOpenRouter(trimmed, prior);
       await recordActivity();
-      void haptic('success', 'ai');
+      void haptics.success();
       setMessages((prev) => [
         ...prev,
         {
@@ -99,7 +99,7 @@ export default function AssistantScreen() {
       ]);
     } catch (error) {
       const detail = error instanceof Error ? error.message : 'Something went wrong';
-      toast.error(detail, 'AI unavailable');
+      notificationService.error(detail, 'AI unavailable');
       setMessages((prev) => [
         ...prev,
         {
