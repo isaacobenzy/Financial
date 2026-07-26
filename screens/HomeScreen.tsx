@@ -10,11 +10,11 @@ import GoalsWidget from '@/components/GoalsWidget';
 import StreakCard from '@/components/StreakCard';
 import AiFab from '@/components/AiFab';
 import HomeLiveWidget from '@/components/HomeLiveWidget';
+import ProfileEditModal from '@/components/ProfileEditModal';
 import { theme } from '@/constants/theme';
 import { onAppOpenHygiene } from '@/lib/insightsNotify';
 import { getSession, type UserSession } from '@/lib/session';
 import { getLedgerBalance } from '@/lib/ledgerStore';
-import { haptic } from '@/lib/haptics';
 
 const STALE_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -22,6 +22,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const [session, setSession] = useState<UserSession | null>(null);
   const [needsImportCta, setNeedsImportCta] = useState(true);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -35,8 +36,7 @@ export default function HomeScreen() {
     }, []),
   );
 
-  const go = async (href: string) => {
-    await haptic('selection');
+  const go = (href: string) => {
     router.push(href as never);
   };
 
@@ -49,7 +49,11 @@ export default function HomeScreen() {
             {session ? `Hi, ${session.name}` : 'Financial Copilot'}
           </Text>
         </View>
-        <TouchableOpacity style={styles.profileBtn} onPress={() => go('/(tabs)/settings')}>
+        <TouchableOpacity
+          style={styles.profileBtn}
+          onPress={() => setProfileOpen(true)}
+          accessibilityLabel="Edit profile"
+        >
           <NaviiAvatar
             seed={session?.naviiSeed || 'guest@financialcopilot.com'}
             size={44}
@@ -57,6 +61,12 @@ export default function HomeScreen() {
           />
         </TouchableOpacity>
       </View>
+
+      <ProfileEditModal
+        visible={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        onSaved={setSession}
+      />
 
       <ScrollView
         style={styles.content}

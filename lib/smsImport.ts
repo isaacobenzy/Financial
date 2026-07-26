@@ -1,6 +1,8 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { requestPermission } from '@/lib/permissions';
+import { isExpoGo } from '@/lib/runtime';
+import { getNativeSmsReader } from '@/lib/nativeSmsReader';
 import { isFinancialSms } from '@/utils/smsParser';
 
 export type SmsMessage = {
@@ -13,6 +15,7 @@ export type SmsMessage = {
 export type SmsImportMode = 'native' | 'demo' | 'unavailable' | 'needs_dev_build';
 
 const PREFER_REAL_KEY = 'sms_prefer_real_v1';
+const SCAN_TIMEOUT_MS = 10_000;
 
 export const DEMO_SMS: SmsMessage[] = [
   {
@@ -47,6 +50,21 @@ export const DEMO_SMS: SmsMessage[] = [
   },
 ];
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out`)), ms);
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+}
+
 export async function markPreferRealSms(): Promise<void> {
   await AsyncStorage.setItem(PREFER_REAL_KEY, '1');
 }
@@ -66,6 +84,17 @@ export async function ensureSmsPermission(): Promise<boolean> {
 
 function filterFinancial(messages: SmsMessage[]): SmsMessage[] {
   return messages.filter((m) => isFinancialSms(m.address, m.body));
+}
+
+function needsDevBuildResult(permissionGranted: boolean) {
+  return {
+    messages: [] as SmsMessage[],
+    usingDemo: false,
+    mode: 'needs_dev_build' as const,
+    permissionGranted,
+    reason:
+      'SMS permission is on, but reading the inbox needs an Android development build (not Expo Go). Paste an SMS meanwhile, or run: pnpm android / EAS preview APK.',
+  };
 }
 
 /**
@@ -114,59 +143,7 @@ export async function fetchInboxSms(options?: {
 
   await markPreferRealSms();
 
-  try {
-    const smsReader = await import('expo-transaction-sms-reader');
-    const status = await smsReader.ensurePermissionsAsync();
-    if (status !== 'granted') {
-      return {
-        messages: [],
-        usingDemo: false,
-        mode: 'unavailable',
-        permissionGranted: false,
-        reason: 'SMS permission was denied by the reader module.',
-      };
-    }
-
-    const since = Date.now() - 60 * 24 * 60 * 60 * 1000;
-    const rows = await smsReader.getRecentMessages({
-      limit: 200,
-      sinceTimestamp: since,
-      onlyTransactions: true,
-      minConfidence: 0.35,
-      senderAllowlist: [
-        'MTN',
-        'MoMo',
-        'Vodafone',
-        'Telecel',
-        'Airtel',
-        'GCB',
-        'ECOBANK',
-        'STANBIC',
-        'ABSA',
-        'CAL',
-        'FIDELITY',
-      ],
-    });
-
-    const messages: SmsMessage[] = rows.map((row, index) => ({
-      id: `inbox-${row.raw?.id ?? row.raw?._id ?? index}-${row.raw?.date ?? index}`,
-      address: row.raw?.address || row.transaction?.sender || 'Unknown',
-      body: row.raw?.body || '',
-      date: String(row.raw?.date ?? row.raw?.timestamp ?? Date.now()),
-    }));
-
-    const financial = filterFinancial(messages);
-    return {
-      messages: financial,
-      usingDemo: false,
-      mode: 'native',
-      permissionGranted: true,
-      reason: financial.length
-        ? undefined
-        : 'Permission granted, but no financial MoMo/bank SMS were found in the last 60 days.',
-    };
-  } catch {
-    // Expo Go / missing native module — do NOT inject demo unless explicitly asked
+  if (isExpoGo()) {
     if (allowDemoFallback) {
       return {
         messages: filterFinancial(DEMO_SMS),
@@ -175,23 +152,91 @@ export async function fetchInboxSms(options?: {
         permissionGranted: true,
       };
     }
-    return {
-      messages: [],
-      usingDemo: false,
-      mode: 'needs_dev_build',
-      permissionGranted: true,
-      reason:
-        'SMS permission is on, but reading the inbox needs a development build (not Expo Go). Paste an SMS meanwhile, or run expo run:android.',
-    };
+    return needsDevBuildResult(true);
+  }
+
+  try {
+    const smsReader = await getNativeSmsReader();
+    if (!smsReader) {
+      return needsDevBuildResult(true);
+    }
+
+    const scan = (async () => {
+      const status = await smsReader.ensurePermissionsAsync();
+      if (status !== 'granted') {
+        return {
+          messages: [] as SmsMessage[],
+          usingDemo: false,
+          mode: 'unavailable' as const,
+          permissionGranted: false,
+          reason: 'SMS permission was denied by the reader module.',
+        };
+      }
+
+      const since = Date.now() - 60 * 24 * 60 * 60 * 1000;
+      const rows = await smsReader.getRecentMessages({
+        limit: 200,
+        sinceTimestamp: since,
+        onlyTransactions: true,
+        minConfidence: 0.35,
+        senderAllowlist: [
+          'MTN',
+          'MoMo',
+          'Vodafone',
+          'Telecel',
+          'Airtel',
+          'GCB',
+          'ECOBANK',
+          'STANBIC',
+          'ABSA',
+          'CAL',
+          'FIDELITY',
+        ],
+      });
+
+      const messages: SmsMessage[] = rows.map((row, index) => ({
+        id: `inbox-${row.raw?.id ?? row.raw?._id ?? index}-${row.raw?.date ?? index}`,
+        address: row.raw?.address || row.transaction?.sender || 'Unknown',
+        body: row.raw?.body || '',
+        date: String(row.raw?.date ?? row.raw?.timestamp ?? Date.now()),
+      }));
+
+      const financial = filterFinancial(messages);
+      return {
+        messages: financial,
+        usingDemo: false,
+        mode: 'native' as const,
+        permissionGranted: true,
+        reason: financial.length
+          ? undefined
+          : 'Permission granted, but no financial MoMo/bank SMS were found in the last 60 days.',
+      };
+    })();
+
+    return await withTimeout(scan, SCAN_TIMEOUT_MS, 'SMS inbox scan');
+  } catch {
+    if (allowDemoFallback) {
+      return {
+        messages: filterFinancial(DEMO_SMS),
+        usingDemo: true,
+        mode: 'demo',
+        permissionGranted: true,
+      };
+    }
+    return needsDevBuildResult(true);
   }
 }
 
 export async function openSmsSettingsIfBlocked(): Promise<void> {
   try {
-    const smsReader = await import('expo-transaction-sms-reader');
-    await smsReader.openAppSettings();
+    const smsReader = await getNativeSmsReader();
+    if (smsReader) {
+      await smsReader.openAppSettings();
+      return;
+    }
   } catch {
-    const { openAppSettings } = await import('@/lib/permissions');
-    await openAppSettings();
+    // fall through
   }
+  const { openAppSettings } = await import('@/lib/permissions');
+  await openAppSettings();
 }

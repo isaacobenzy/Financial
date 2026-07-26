@@ -3,7 +3,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { Platform, StyleSheet, View } from 'react-native';
 import { theme } from '@/constants/theme';
-import { haptic } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 
 function TabIcon({
   name,
@@ -38,7 +38,7 @@ export default function TabLayout() {
       }}
       screenListeners={{
         tabPress: () => {
-          void haptic('selection');
+          void haptics.select();
         },
       }}
     >

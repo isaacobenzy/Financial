@@ -27,11 +27,11 @@ import {
   upsertGoal,
   type FinancialGoal,
 } from '@/lib/goalsStore';
-import { haptic } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { recordActivity } from '@/lib/achievements';
-import { toast } from '@/lib/toast';
+import { notificationService } from '@/lib/notificationStore';
 import { refreshWidgetSnapshot } from '@/lib/widgetBridge';
-import { notifyUser } from '@/lib/notify';
+import { emitActivityPulse } from '@/lib/liveActivityFeed';
 import AiFab from '@/components/AiFab';
 
 const ICON_OPTIONS: Array<keyof typeof MaterialCommunityIcons.glyphMap> = [
@@ -62,6 +62,7 @@ export default function GoalsScreen() {
   const [goals, setGoals] = useState<FinancialGoal[]>([]);
   const [period, setPeriod] = useState<'monthly' | 'yearly'>('monthly');
   const [editing, setEditing] = useState<FinancialGoal | null>(null);
+  const [isNewGoal, setIsNewGoal] = useState(false);
   const [name, setName] = useState('');
   const [target, setTarget] = useState('');
   const [current, setCurrent] = useState('');
@@ -79,8 +80,9 @@ export default function GoalsScreen() {
   );
 
   const openEdit = (goal?: FinancialGoal) => {
-    void haptic('selection');
+    void haptics.select();
     const g = goal || createEmptyGoal({ period, kind: 'savings' });
+    setIsNewGoal(!goal);
     setEditing(g);
     setName(g.name === 'New goal' && !goal ? '' : g.name);
     setTarget(String(g.target));
@@ -91,12 +93,13 @@ export default function GoalsScreen() {
   const closeModal = () => {
     Keyboard.dismiss();
     setEditing(null);
+    setIsNewGoal(false);
   };
 
   const saveEdit = async () => {
     if (!editing) return;
     if (!name.trim()) {
-      toast.error('Give your goal a name');
+      notificationService.error('Give your goal a name');
       return;
     }
     const next: FinancialGoal = {
@@ -112,27 +115,38 @@ export default function GoalsScreen() {
     setGoals(list);
     await recordActivity();
     await refreshWidgetSnapshot();
-    await haptic('success');
-    toast.success(
+    notificationService.success(
       next.kind === 'savings'
         ? 'Raise Current toward Target to complete this goal'
         : 'Budget goal saved — keep Current at or under Target',
       'Goal saved',
     );
+    await emitActivityPulse({
+      kind: 'goal',
+      title: isNewGoal ? 'Goal created' : 'Goal updated',
+      body: `“${next.name}” is ready to track.`,
+      href: '/(tabs)/goals',
+      goalId: next.id,
+    });
     closeModal();
   };
 
   const completeGoal = async (id: string) => {
+    const before = goals.find((g) => g.id === id);
     const list = await markGoalComplete(id);
     setGoals(list);
     await recordActivity();
     await refreshWidgetSnapshot();
-    await haptic('success');
-    toast.success('Nice work — goal marked complete');
-    await notifyUser('Goal complete', 'You finished a financial goal. Keep the streak going.', 'goal', {
-      categoryId: 'goal_milestone',
-      data: { screen: 'goals' },
-    });
+    notificationService.success('Nice work — goal marked complete');
+    if (before) {
+      await emitActivityPulse({
+        kind: 'goal',
+        title: 'Goal complete',
+        body: `You finished “${before.name}”.`,
+        href: '/(tabs)/goals',
+        goalId: id,
+      });
+    }
     closeModal();
   };
 
@@ -145,10 +159,29 @@ export default function GoalsScreen() {
       setEditing(updated);
       setCurrent(String(updated.current));
       if (updated.status === 'completed') {
-        await haptic('success');
-        toast.success('Goal completed!');
+        notificationService.success('Goal completed!');
+        await emitActivityPulse({
+          kind: 'goal',
+          title: 'Goal complete',
+          body: `You finished “${updated.name}”.`,
+          href: '/(tabs)/goals',
+          goalId: updated.id,
+        });
       } else {
-        await haptic('light');
+        await haptics.buttonPress();
+        const pct =
+          updated.target > 0
+            ? Math.min(100, Math.round((updated.current / updated.target) * 100))
+            : 0;
+        if (pct >= 80) {
+          await emitActivityPulse({
+            kind: 'goal',
+            title: 'Almost there',
+            body: `“${updated.name}” is at ${pct}% of target.`,
+            href: '/(tabs)/goals',
+            goalId: updated.id,
+          });
+        }
       }
     }
     await refreshWidgetSnapshot();
@@ -157,8 +190,7 @@ export default function GoalsScreen() {
   const deleteGoal = async (id: string) => {
     const list = await removeGoal(id);
     setGoals(list);
-    await haptic('warning');
-    toast.info('Goal removed');
+    notificationService.info('Goal removed');
     closeModal();
   };
 
@@ -183,7 +215,7 @@ export default function GoalsScreen() {
             key={p}
             style={[styles.periodBtn, period === p && styles.periodBtnActive]}
             onPress={async () => {
-              await haptic('selection');
+              await haptics.select();
               setPeriod(p);
             }}
           >
@@ -377,7 +409,7 @@ export default function GoalsScreen() {
                         setGoals(list);
                         const g = list.find((x) => x.id === editing.id);
                         if (g) setEditing(g);
-                        toast.info('Goal reopened');
+                        notificationService.info('Goal reopened');
                       }}
                     >
                       <Text style={styles.reopenBtnText}>Reopen goal</Text>

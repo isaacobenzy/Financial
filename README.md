@@ -168,10 +168,56 @@ Configured in `app.json`.
 |---------|---------|
 | `pnpm start` | Start Metro / Expo |
 | `pnpm android` / `pnpm ios` | Native run |
+| `pnpm export:web` | Static web export → `dist/` |
+| `pnpm deploy:web` | Export + [EAS Hosting](https://docs.expo.dev/eas/hosting/get-started/) deploy |
+| `pnpm build:android:preview` | [Internal Android APK](https://docs.expo.dev/tutorial/eas/internal-distribution-builds/) |
 | `pnpm typecheck` | TypeScript |
 | `pnpm lint` | ESLint |
 | `pnpm test` / `pnpm test:ci` | Jest |
 | `pnpm doctor` | expo-doctor |
+
+---
+
+## Share preview links (Android + Web, no Apple account)
+
+You do **not** need an Apple Developer account for Android APKs or the web preview.
+
+### 1. Link the EAS project (once)
+
+```bash
+pnpm add --global eas-cli   # or: npx eas-cli@latest
+eas login
+eas init                    # writes expo.extra.eas.projectId into app.json
+```
+
+Commit the updated `app.json` (with `projectId`). Add a GitHub secret `EXPO_TOKEN` from [expo.dev/settings/access-tokens](https://expo.dev/settings/access-tokens).
+
+### 2. Android install link (BetLive-style internal distribution)
+
+Same flow BetLive uses for testers ([internal distribution](https://docs.expo.dev/tutorial/eas/internal-distribution-builds/)):
+
+```bash
+pnpm build:android:preview          # shareable APK (no Metro needed)
+# optional JS-only updates after they install once:
+pnpm update:preview -- "Fix goals toast"
+```
+
+When the build finishes: EAS dashboard → **Install** / QR → share that link.  
+After the APK is installed, `eas update --channel preview` ships new JS without rebuilding native (BetLive’s “preview update” pattern).
+
+EAS Workflows (repo): `.eas/workflows/android-preview-build.yml`, `publish-preview-update.yml`.
+
+### 3. Web preview URL (EAS Hosting)
+
+```bash
+pnpm deploy:web
+```
+
+You get a URL like `https://your-app.expo.app/` ([EAS Hosting](https://docs.expo.dev/eas/hosting/get-started/)). GitHub: **EAS Web Hosting** workflow.
+
+### Expo Go limits
+
+Expo Go cannot do real SMS inbox, full push notifications, or lock-screen live status. Use the Android preview APK for those. In Expo Go you still get toasts + Paste SMS / sample import.
 
 ---
 
@@ -188,33 +234,63 @@ Configured in `app.json`.
 
 ## Widgets & Live Activities
 
-- **In-app Live widget** on Home shows privacy-masked balance, streak, and top goal progress (updates after import).
-- **Native iOS home-screen widgets / Live Activities** via `expo-widgets` require **Expo SDK 56+** and a **development build** — this project is on SDK 54, so the snapshot in `lib/widgetBridge.ts` is ready to pipe into `expo-widgets` after an upgrade.
-- Widget balance is **always masked** by default (home/lock screens are more exposed than the app).
+- **In-app Live widget** on Home shows hide/show balance, streak, and top goal progress.
+- **Android lock-screen live status**: sticky branded notification (`lib/liveActivity.ts`) with the app notification icon — updates on sign-in, goals, and balance refresh. Clear on sign-out.
+- **Native iOS Live Activities / home widgets** via `expo-widgets` need **Expo SDK 56+** and a native extension; SDK 54 uses the Android live notification + in-app widget.
 
-## Notifications
+## Sensory feedback (BetLive-style)
 
-Local notifications (toast + system when permitted):
+Three layers — feel / see / hear:
+
+| Layer | Module | Notes |
+|-------|--------|--------|
+| Haptics | `lib/haptics.ts`, `hooks/useHaptics.ts` | Semantic: `buttonPress`, `select`, `success`… never throws |
+| Toasts | `lib/notificationStore.ts` → `notificationService` + `NotificationStack` | Toast always pairs matching haptic |
+| Push | `lib/pushNotifications.ts` | Settings gate → Expo Push → local → toast fallback |
+
+Deep links use `data.href` (or `goalId` / `screen`). Settings UI: `/notifications-settings`.
+
+**Expo Go:** Android SDK 53+ cannot use remote push — use `pnpm build:android:preview`. Toasts + haptics still work.
+
+## Splash (animated)
+
+- Native splash via `expo-splash-screen` plugin + `SplashScreen.setOptions({ fade: true })` ([docs](https://docs.expo.dev/versions/latest/sdk/splash-screen/)).
+- Custom branded `AnimatedSplash` (logo scale + fade) after fonts load.
+- Test splash on a **preview/production** build — Expo Go shows the app icon instead ([guide](https://docs.expo.dev/develop/user-interface/splash-screen-and-app-icon/)).
+
+## Notifications & push
+
+Aligned with [Expo push setup](https://docs.expo.dev/push-notifications/push-notifications-setup/) and [receiving notifications](https://docs.expo.dev/push-notifications/receiving-notifications/):
+
+- Registers `ExpoPushToken` with `eas.projectId` from `app.json`.
+- Foreground handler shows banner/list; taps deep-link into Home / Goals / Assistant / Import.
+- Incoming payloads are read from `notification.request.content.data`.
+- Android notification **icon + color** from the `expo-notifications` plugin.
+- Settings → **Register for push** / **Send test push**, or paste the token into [expo.dev/notifications](https://expo.dev/notifications).
+- **Android remote push** also needs [FCM V1 credentials](https://docs.expo.dev/push-notifications/fcm-credentials/) on your EAS project (one-time).
+- **Live lock-screen widgets** (Android sticky notifications): Overview, Balance, Goals, Streak — toggle in Settings.
 
 | Kind | When |
 |------|------|
-| Import digest | After SMS/paste import — count + weekly spend |
-| Goal milestones | 50% / 90% / 100% progress |
-| Spend nudge | Simple grounded anomaly (e.g. food vs usual) |
+| Sign in / out | Session start and end (+ live widgets) |
+| Goal created / updated | After saving a goal |
+| Almost there | Goal reaches ~80%+ |
+| Goal milestones | 50% / 90% / 100% |
+| Import digest | After SMS/paste import |
+| Spend nudge | Grounded anomaly (e.g. food vs usual) |
 | Streak at risk | Evening reminder if not checked in |
-| Login / logout | Session events |
+| Test push | Settings or Expo push tool |
 
-Action buttons (dev build): **Categorize**, **Ask AI**, **View goals**, **Check in**.
+## Haptics
 
-Android notification icon: `assets/images/notification-icon.png` (white glyph). Splash: cedar branding on paper green.
+Settings toggle. When on, feedback only for: **login success**, **tab bar**, **AI reply**, **goals**.
 
 ## Notes & limits
 
 - **iOS cannot read the SMS inbox** by design; Paste SMS is the intended path.
-- After **Allow SMS**, the app never silently injects demo data. Real inbox import needs a **dev build** with an SMS reader module; Expo Go shows a clear empty state + Paste SMS.
+- After **Allow SMS**, Expo Go exits quickly to Paste SMS / sample — it cannot hang on “Reading financial alerts…”. Real inbox needs `pnpm android` (dev build) with `expo-transaction-sms-reader`.
 - Real imports **replace demo ledger rows**.
-- AI answers are only as good as imported ledger data; it will not invent transactions.
-- This build uses demo auth credentials — not production identity (no Clerk/backend yet).
+- Local accounts: sign up on the login screen, or use demo credentials. Tap your avatar to edit profile.
 
 ---
 

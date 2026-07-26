@@ -1,43 +1,34 @@
 import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
-import { supportsSystemNotifications } from '@/lib/runtime';
+import {
+  registerForPushNotifications,
+  setupNotificationResponseListeners,
+  warmPushStack,
+} from '@/lib/pushNotifications';
+import { startLiveActivityFeed } from '@/lib/liveActivityFeed';
+import { useNotificationSettingsStore } from '@/lib/notificationSettingsStore';
 
-/** Routes actionable notification buttons — skipped in Expo Go. */
+/**
+ * Bootstrap push registration + deep-link listeners (BetLive pattern).
+ */
 export default function NotificationActions() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!supportsSystemNotifications()) return;
-
-    let sub: { remove: () => void } | undefined;
+    let cleanup: (() => void) | undefined;
 
     (async () => {
-      try {
-        const Notifications = await import('expo-notifications');
-        sub = Notifications.addNotificationResponseReceivedListener((response) => {
-          const action = response.actionIdentifier;
-          const data = response.notification.request.content.data as {
-            screen?: string;
-          };
-
-          if (action === 'ask_ai' || data?.screen === 'assistant') {
-            router.push('/assistant');
-            return;
-          }
-          if (action === 'view_goals' || data?.screen === 'goals') {
-            router.push('/(tabs)/goals');
-            return;
-          }
-          if (action === 'categorize' || action === 'check_in' || data?.screen === 'transactions') {
-            router.push(data?.screen === 'transactions' ? '/transactions' : '/(tabs)');
-          }
-        });
-      } catch {
-        // ignore
-      }
+      // Warm native module + channels first so the first alert is instant
+      void warmPushStack();
+      await useNotificationSettingsStore.getState().hydrate();
+      await registerForPushNotifications();
+      cleanup = await setupNotificationResponseListeners((href) => {
+        router.push(href as never);
+      });
+      startLiveActivityFeed();
     })();
 
-    return () => sub?.remove();
+    return () => cleanup?.();
   }, [router]);
 
   return null;

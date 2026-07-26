@@ -3,13 +3,15 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-nativ
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { toast } from '@/lib/toast';
 import { theme } from '@/constants/theme';
 import NaviiAvatar from '@/components/NaviiAvatar';
+import PrimaryButton from '@/components/PrimaryButton';
 import { seedFromEmail } from '@/lib/navii';
 import { getSession, saveSession } from '@/lib/session';
-import { haptic } from '@/lib/haptics';
-import { notifyUser } from '@/lib/notify';
+import { authenticateAccount, registerAccount } from '@/lib/accounts';
+import { haptics } from '@/lib/haptics';
+import { notificationService } from '@/lib/notificationStore';
+import { notifyAuthEvent } from '@/lib/liveActivity';
 import {
   authenticateBiometric,
   getBiometricLabel,
@@ -20,11 +22,13 @@ import {
 const DEMO_CREDENTIALS = {
   email: 'demo@financialcopilot.com',
   password: 'demo123',
+  name: 'Demo User',
 };
 
 export default function LoginScreen() {
   const router = useRouter();
   const [isLogin, setIsLogin] = useState(true);
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [bioReady, setBioReady] = useState(false);
@@ -46,42 +50,75 @@ export default function LoginScreen() {
     [email],
   );
 
-  const enterApp = async () => {
+  const enterApp = async (displayName?: string) => {
     await markAppUnlocked();
+    // Single auth alert — avoid a second delayed “Signed in” pulse
+    void notifyAuthEvent('login', displayName);
     router.replace('/(tabs)');
   };
 
   const handleAuth = async () => {
-    if (isLogin) {
-      if (email === DEMO_CREDENTIALS.email && password === DEMO_CREDENTIALS.password) {
-        await saveSession(email, 'Demo User');
-        await haptic('success');
-        await notifyUser('Signed in', 'Welcome back to Financial Copilot', 'login');
-        await enterApp();
-      } else {
-        await haptic('error');
-        toast.error('Use the demo credentials below', 'Invalid login');
-      }
-    } else {
-      await haptic('warning');
-      toast.info('Please use the demo credentials for this build', 'Demo only');
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail || !password) {
+      notificationService.error('Enter email and password');
+      return;
     }
+
+    if (isLogin) {
+      if (
+        trimmedEmail === DEMO_CREDENTIALS.email &&
+        password === DEMO_CREDENTIALS.password
+      ) {
+        await saveSession(trimmedEmail, DEMO_CREDENTIALS.name);
+        await enterApp(DEMO_CREDENTIALS.name);
+        return;
+      }
+
+      const account = await authenticateAccount(trimmedEmail, password);
+      if (account) {
+        await saveSession(account.email, account.name, account.phone);
+        await enterApp(account.name);
+        return;
+      }
+
+      notificationService.error(
+        'Check your email and password, or create an account',
+        'Invalid login',
+      );
+      return;
+    }
+
+    const result = await registerAccount({
+      email: trimmedEmail,
+      password,
+      name: name.trim() || trimmedEmail.split('@')[0] || 'User',
+    });
+    if (!result.ok) {
+      notificationService.error(result.error);
+      return;
+    }
+    const account = await authenticateAccount(trimmedEmail, password);
+    if (!account) {
+      notificationService.error('Account created but sign-in failed — try logging in');
+      setIsLogin(true);
+      return;
+    }
+    await saveSession(account.email, account.name, account.phone);
+    notificationService.success('Account created');
+    await enterApp(account.name);
   };
 
   const handleBiometricLogin = async () => {
     const session = await getSession();
     if (!session) {
-      toast.error('Sign in with demo credentials once first');
+      notificationService.error('Sign in with your password once first');
       return;
     }
     const ok = await authenticateBiometric(`Sign in with ${bioLabel}`);
     if (ok) {
-      await haptic('success');
-      await notifyUser('Unlocked', `Welcome back, ${session.name}`, 'login');
-      router.replace('/(tabs)');
+      await enterApp(session.name);
     } else {
-      await haptic('error');
-      toast.error('Biometric unlock cancelled');
+      notificationService.error('Biometric unlock cancelled');
     }
   };
 
@@ -90,10 +127,25 @@ export default function LoginScreen() {
       <View style={styles.header}>
         <NaviiAvatar seed={previewSeed} size={88} mood={isLogin ? 'happy' : 'wink'} />
         <Text style={styles.title}>Financial Copilot</Text>
-        <Text style={styles.subtitle}>Your AI-powered ledger companion</Text>
+        <Text style={styles.subtitle}>
+          {isLogin ? 'Sign in to your ledger' : 'Create your account'}
+        </Text>
       </View>
 
       <View style={styles.form}>
+        {!isLogin ? (
+          <View style={styles.inputWrap}>
+            <MaterialCommunityIcons name="account-outline" size={20} color={theme.colors.muted} />
+            <TextInput
+              style={styles.input}
+              placeholder="Full name"
+              placeholderTextColor={theme.colors.muted}
+              value={name}
+              onChangeText={setName}
+              autoCapitalize="words"
+            />
+          </View>
+        ) : null}
         <View style={styles.inputWrap}>
           <MaterialCommunityIcons name="email-outline" size={20} color={theme.colors.muted} />
           <TextInput
@@ -118,24 +170,29 @@ export default function LoginScreen() {
           />
         </View>
 
-        <TouchableOpacity style={styles.authButton} onPress={handleAuth}>
-          <MaterialCommunityIcons name="login" size={18} color={theme.colors.white} />
-          <Text style={styles.authButtonText}>{isLogin ? 'Login' : 'Sign Up'}</Text>
-        </TouchableOpacity>
+        <PrimaryButton
+          label={isLogin ? 'Sign in' : 'Create account'}
+          icon="login"
+          onPress={handleAuth}
+        />
 
         {bioReady ? (
-          <TouchableOpacity style={styles.bioButton} onPress={handleBiometricLogin}>
-            <MaterialCommunityIcons name="fingerprint" size={20} color={theme.colors.cedarDeep} />
-            <Text style={styles.bioButtonText}>Use {bioLabel}</Text>
-          </TouchableOpacity>
+          <PrimaryButton
+            label={`Use ${bioLabel}`}
+            icon="fingerprint"
+            variant="secondary"
+            onPress={handleBiometricLogin}
+          />
         ) : null}
 
         <TouchableOpacity
           style={styles.demoButton}
-          onPress={() => {
+          onPress={async () => {
+            await haptics.select();
+            setIsLogin(true);
             setEmail(DEMO_CREDENTIALS.email);
             setPassword(DEMO_CREDENTIALS.password);
-            toast.info('Demo email and password filled in', 'Ready to go');
+            notificationService.info('Demo email and password filled in', 'Ready to go');
           }}
         >
           <MaterialCommunityIcons name="account-check-outline" size={18} color={theme.colors.cedarDeep} />
@@ -144,7 +201,7 @@ export default function LoginScreen() {
 
         <TouchableOpacity style={styles.switchButton} onPress={() => setIsLogin(!isLogin)}>
           <Text style={styles.switchButtonText}>
-            {isLogin ? "Don't have an account? Sign Up" : 'Already have an account? Login'}
+            {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -194,36 +251,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     fontSize: 16,
     color: theme.colors.ink,
-  },
-  authButton: {
-    backgroundColor: theme.colors.cedar,
-    padding: 16,
-    borderRadius: theme.radius.md,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  authButtonText: {
-    color: theme.colors.white,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  bioButton: {
-    backgroundColor: theme.colors.white,
-    borderWidth: 1,
-    borderColor: theme.colors.cedar,
-    padding: 16,
-    borderRadius: theme.radius.md,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  bioButtonText: {
-    color: theme.colors.cedarDeep,
-    fontSize: 15,
-    fontWeight: '700',
   },
   demoButton: {
     backgroundColor: theme.colors.sage,

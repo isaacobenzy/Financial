@@ -1,21 +1,19 @@
 name: Build
 
+# Android-only EAS Workflow — no Apple Developer account required.
+# Internal distribution (shareable install link):
+# https://docs.expo.dev/tutorial/eas/internal-distribution-builds/
+
 on:
   push:
     branches:
       - main
+  workflow_dispatch: {}
 
 jobs:
-  build_android:
-    name: Build Android App
+  build_android_preview:
+    name: Build Android Preview APK
     type: build
     params:
       platform: android
-      profile: production
-
-  build_ios:
-    name: Build iOS App
-    type: build
-    params:
-      platform: ios
-      profile: production
+      profile: preview

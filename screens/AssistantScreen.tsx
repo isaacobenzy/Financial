@@ -16,9 +16,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { theme } from '@/constants/theme';
 import { askOpenRouter, type ChatMessage } from '@/lib/openrouter';
-import { toast } from '@/lib/toast';
-import { haptic } from '@/lib/haptics';
+import { haptics } from '@/lib/haptics';
 import { recordActivity } from '@/lib/achievements';
+import { notificationService } from '@/lib/notificationStore';
 
 const DEFAULT_PROMPTS = [
   'How much did I spend recently?',
@@ -70,7 +70,6 @@ export default function AssistantScreen() {
     const trimmed = text.trim();
     if (!trimmed || loading) return;
 
-    void haptic('light');
     const userMsg: UiMessage = {
       id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       role: 'user',
@@ -89,7 +88,7 @@ export default function AssistantScreen() {
       const prior = history.slice(0, -1);
       const reply = await askOpenRouter(trimmed, prior);
       await recordActivity();
-      void haptic('success');
+      void haptics.success();
       setMessages((prev) => [
         ...prev,
         {
@@ -100,8 +99,7 @@ export default function AssistantScreen() {
       ]);
     } catch (error) {
       const detail = error instanceof Error ? error.message : 'Something went wrong';
-      void haptic('error');
-      toast.error(detail, 'AI unavailable');
+      notificationService.error(detail, 'AI unavailable');
       setMessages((prev) => [
         ...prev,
         {
@@ -130,7 +128,6 @@ export default function AssistantScreen() {
           <View style={styles.headerTop}>
             <TouchableOpacity
               onPress={() => {
-                void haptic('selection');
                 if (router.canGoBack()) router.back();
                 else router.replace('/(tabs)');
               }}

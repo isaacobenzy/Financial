@@ -55,6 +55,12 @@ export async function buildWidgetSnapshot(): Promise<WidgetSnapshot> {
 export async function refreshWidgetSnapshot(): Promise<WidgetSnapshot> {
   const snap = await buildWidgetSnapshot();
   await AsyncStorage.setItem(WIDGET_KEY, JSON.stringify(snap));
+  try {
+    const { publishLiveSections } = await import('@/lib/liveActivity');
+    await publishLiveSections(snap);
+  } catch {
+    // ignore
+  }
   return snap;
 }
 

@@ -97,15 +97,22 @@ export default function ExploreScreen() {
     setPhase('ready');
   };
 
+  const cancelLoading = () => {
+    setImporting(false);
+    setPhase('empty');
+    setReason(
+      'Scan cancelled or timed out. Paste an SMS, use sample data, or try again from a development build.',
+    );
+    toast.info('You can paste SMS or use sample data instead', 'Import ready');
+  };
+
   const requestAndScan = async () => {
-    await haptic('medium');
     setPhase('loading');
     setUsingDemo(false);
 
     if (Platform.OS === 'android') {
       const granted = await requestPermission('sms');
       if (!granted) {
-        await haptic('warning');
         toast.info('Permission needed to read financial SMS', 'SMS access');
         setPhase('landing');
         return;
@@ -113,7 +120,7 @@ export default function ExploreScreen() {
     }
 
     try {
-      // Never allow silent demo fallback after Allow
+      // Never allow silent demo fallback after Allow; fetchInboxSms always times out
       const result = await fetchInboxSms({ allowDemoFallback: false });
       setMessages(result.messages);
       setUsingDemo(false);
@@ -121,18 +128,15 @@ export default function ExploreScreen() {
       setReason(result.reason);
 
       if (result.mode === 'native' && result.messages.length > 0) {
-        await haptic('success');
-        // Auto-import real inbox and replace demo ledger rows
         await commitImport(result.messages, false);
         return;
       }
 
-      await haptic(result.messages.length ? 'success' : 'warning');
       setPhase(result.messages.length ? 'ready' : 'empty');
     } catch {
-      await haptic('error');
-      toast.error('Could not scan SMS');
-      setPhase('landing');
+      toast.error('Could not scan SMS — try Paste SMS instead');
+      setPhase('empty');
+      setReason('Inbox scan failed. Paste an alert or use sample data.');
     }
   };
 
@@ -244,6 +248,12 @@ export default function ExploreScreen() {
           <Text style={styles.loadingText}>
             {importing ? 'Importing into your ledger…' : 'Reading financial alerts…'}
           </Text>
+          <Text style={styles.loadingHint}>This usually finishes in a few seconds</Text>
+          {phase === 'loading' && !importing ? (
+            <TouchableOpacity style={styles.cancelScanBtn} onPress={cancelLoading}>
+              <Text style={styles.cancelScanText}>Cancel & choose another way</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       ) : null}
 
@@ -407,8 +417,17 @@ const styles = StyleSheet.create({
   demoButton: { padding: 12 },
   demoButtonText: { color: theme.colors.brass, fontSize: 14, fontWeight: '700' },
   settingsLink: { color: theme.colors.muted, fontSize: 13, textDecorationLine: 'underline' },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
   loadingText: { color: theme.colors.muted, fontSize: 13 },
+  loadingHint: { color: theme.colors.tabInactive, fontSize: 12, textAlign: 'center' },
+  cancelScanBtn: {
+    marginTop: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.sage,
+  },
+  cancelScanText: { color: theme.colors.cedarDeep, fontWeight: '700', fontSize: 14 },
   empty: { textAlign: 'center', color: theme.colors.muted, marginTop: 40 },
   footer: { position: 'absolute', left: 16, right: 16, bottom: 20, gap: 10 },
   importBtn: {

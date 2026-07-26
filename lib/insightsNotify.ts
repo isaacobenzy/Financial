@@ -54,7 +54,7 @@ export async function afterImportInsights(params: {
   await scheduleStreakReminder();
 }
 
-async function checkGoalMilestones(): Promise<void> {
+export async function checkGoalMilestones(): Promise<void> {
   const goals = await getGoals();
   let sent: Record<string, number> = {};
   try {
@@ -115,4 +115,50 @@ async function checkSpendAnomaly(transactions: Transaction[]): Promise<void> {
 export async function onAppOpenHygiene(): Promise<void> {
   await refreshWidgetSnapshot();
   await scheduleStreakReminder();
+}
+
+/** Push when a goal is created, updated, nearing complete, or finished. */
+export async function notifyGoalLifecycle(
+  action: 'created' | 'updated' | 'completed',
+  goal: { id: string; name: string; current: number; target: number },
+): Promise<void> {
+  const pct =
+    goal.target > 0 ? Math.min(100, Math.round((goal.current / goal.target) * 100)) : 0;
+
+  if (action === 'created') {
+    await notifyUser('Goal created', `“${goal.name}” is ready — track progress anytime.`, 'goal', {
+      categoryId: 'goal_milestone',
+      data: { screen: 'goals', goalId: goal.id },
+    });
+  } else if (action === 'updated') {
+    await notifyUser(
+      'Goal updated',
+      `“${goal.name}” is at ${pct}% of target.`,
+      'goal',
+      {
+        categoryId: 'goal_milestone',
+        data: { screen: 'goals', goalId: goal.id },
+      },
+    );
+  } else {
+    await notifyUser('Goal complete', `You finished “${goal.name}”. Great work.`, 'goal', {
+      categoryId: 'goal_milestone',
+      data: { screen: 'goals', goalId: goal.id },
+    });
+  }
+
+  if (action !== 'completed' && pct >= 80 && pct < 100) {
+    await notifyUser(
+      'Almost there',
+      `“${goal.name}” is at ${pct}% — a little more to finish.`,
+      'goal',
+      {
+        categoryId: 'goal_milestone',
+        data: { screen: 'goals', goalId: goal.id },
+      },
+    );
+  }
+
+  await checkGoalMilestones();
+  await refreshWidgetSnapshot();
 }
