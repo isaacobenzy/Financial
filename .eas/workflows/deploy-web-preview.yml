@@ -1,0 +1,43 @@
+# Shareable web preview URL via EAS Hosting (NOT an APK / OTA update).
+# Runs as the linked Expo project — no GitHub EXPO_TOKEN required.
+#
+# Emits a preview deployment URL (prod: false), optionally aliased as "preview":
+#   https://<subdomain>--preview.expo.app/
+#   https://<subdomain>--<deploymentId>.expo.app/
+#
+# Docs: https://docs.expo.dev/eas/hosting/workflows/
+
+name: Deploy Web Preview
+
+on:
+  push:
+    branches:
+      - staging
+  pull_request:
+    branches:
+      - staging
+      - main
+  workflow_dispatch: {}
+
+concurrency:
+  cancel_in_progress: true
+  group: ${{ workflow.filename }}-${{ github.ref }}
+
+defaults:
+  tools:
+    node: '20.19.4'
+
+jobs:
+  deploy_web_preview:
+    name: Deploy web preview
+    type: deploy
+    environment: preview
+    params:
+      prod: false
+      alias: preview
+
+  comment_preview_url:
+    name: Comment preview URL on PR
+    needs: [deploy_web_preview]
+    if: ${{ github.event_name == 'pull_request' }}
+    type: github-comment

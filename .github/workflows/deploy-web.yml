@@ -1,16 +1,24 @@
-name: EAS Web Hosting
+name: Deploy Web
 
-# Export web + deploy to EAS Hosting (same EXPO_TOKEN pattern as Android APK builds).
-# Shareable URL:
-#   staging / preview → https://<subdomain>--preview.expo.app/
-#   main / production → https://<subdomain>.expo.app/
-# Docs: https://docs.expo.dev/eas/hosting/get-started/
+# Optional GitHub Actions path for EAS Hosting (uses secrets.EXPO_TOKEN).
+# Prefer EAS Workflows (.eas/workflows/deploy-web-*.yml) when the Expo GitHub
+# integration is linked — those run as the project and do not need this secret.
+#
+# Flow:
+#   1. Push / workflow_dispatch
+#   2. Checkout
+#   3. Authenticate EAS CLI via expo/expo-github-action + secrets.EXPO_TOKEN
+#   4. pnpm export:web → static site in dist/
+#   5. eas deploy --non-interactive → preview URL (or --prod on main)
+#
+# Shareable URL is from eas deploy (Hosting), not from publish-preview-update.yml
+# (that file is EAS Update / OTA for installed APKs only).
 
 on:
   workflow_dispatch:
     inputs:
       environment:
-        description: preview or production (EAS Hosting alias)
+        description: preview or production (EAS Hosting)
         required: true
         default: preview
         type: choice
@@ -23,11 +31,11 @@ on:
       - staging
 
 concurrency:
-  group: eas-web-${{ github.ref }}
+  group: deploy-web-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build_and_deploy:
+  deploy:
     name: Export web & eas deploy
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -44,7 +52,7 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
-      - name: Setup Expo and EAS
+      - name: Setup EAS
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
@@ -88,5 +96,6 @@ jobs:
           if [ "$ENV" = "production" ]; then
             eas deploy --non-interactive --prod
           else
+            # Preview hosting (not --prod) + stable alias for sharing
             eas deploy --non-interactive --alias preview
           fi

@@ -219,19 +219,47 @@ EAS Workflows (repo): `.eas/workflows/android-preview-build.yml`, `publish-previ
 
 Anyone can open the app in a browser (no APK). SMS inbox / OS push / biometrics still need the Android build.
 
-Uses the same `EXPO_TOKEN` GitHub Actions secret as Android EAS builds (already linked via `app.json` `extra.eas.projectId`).
+#### How the preview URL is produced
 
-```bash
-# Stable shareable preview
-pnpm deploy:web:preview
-# → https://<your-subdomain>--preview.expo.app/
+There are **two deploy paths** (same end result: a public `https://….expo.app` link):
 
-# Production alias
-pnpm deploy:web:prod
-# → https://<your-subdomain>.expo.app/
+**A. EAS Workflows (preferred — no GitHub `EXPO_TOKEN`)**  
+Linked Expo project runs the job itself:
+
+| Workflow | When | Result |
+|----------|------|--------|
+| [`.eas/workflows/deploy-web-preview.yml`](.eas/workflows/deploy-web-preview.yml) | Push/`PR` → `staging`, dispatch | `type: deploy` with `prod: false` + alias `preview` |
+| [`.eas/workflows/deploy-web-production.yml`](.eas/workflows/deploy-web-production.yml) | Push → `main` | `type: deploy` with `prod: true` |
+
+```yaml
+jobs:
+  deploy_web_preview:
+    type: deploy
+    params:
+      prod: false   # preview hosting, not --prod
+      alias: preview
 ```
 
-CI (**EAS Web Hosting**): on push to `staging` / `main` (and workflow_dispatch) exports the web build, uploads a `web-dist-…` artifact, and deploys with `EXPO_TOKEN` — same pattern as the Android APK workflow.
+**B. GitHub Actions** ([`.github/workflows/deploy-web.yml`](.github/workflows/deploy-web.yml)) — uses `EXPO_TOKEN`:
+
+1. Push to `main` / `staging` (or manual `workflow_dispatch`)
+2. Checkout
+3. Authenticate EAS CLI via `expo/expo-github-action` + `secrets.EXPO_TOKEN`
+4. `pnpm export:web` → `expo export --platform web` (static site in `dist/`)
+5. `eas deploy --non-interactive` → upload to EAS Hosting and emit a preview URL (not production unless `main` / `--prod`)
+
+Locally the same flow:
+
+```bash
+pnpm deploy:web:preview   # → https://<subdomain>--preview.expo.app/
+pnpm deploy:web:prod      # → https://<subdomain>.expo.app/
+```
+
+Without `EXPO_TOKEN`, the **Actions** job cannot authenticate. **EAS Workflows** do not need that secret because they already run as the linked Expo project.
+
+#### Related (not web hosting)
+
+[`publish-preview-update.yml`](.eas/workflows/publish-preview-update.yml) publishes an **EAS Update** (OTA JS for installed APKs / native clients), **not** a public web URL. The shareable browser URL is specifically from `eas deploy` / the `type: deploy` workflow.
 
 Demo login on web: `demo@financialcopilot.com` / `demo123`.
 

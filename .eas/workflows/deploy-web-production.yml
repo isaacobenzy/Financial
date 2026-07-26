@@ -1,0 +1,30 @@
+# Production web URL via EAS Hosting.
+# Runs as the linked Expo project — no GitHub EXPO_TOKEN required.
+#
+#   https://<subdomain>.expo.app/
+#
+# Docs: https://docs.expo.dev/eas/hosting/workflows/
+
+name: Deploy Web Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: {}
+
+concurrency:
+  cancel_in_progress: true
+  group: ${{ workflow.filename }}-${{ github.ref }}
+
+defaults:
+  tools:
+    node: '20.19.4'
+
+jobs:
+  deploy_web_production:
+    name: Deploy web production
+    type: deploy
+    environment: production
+    params:
+      prod: true
