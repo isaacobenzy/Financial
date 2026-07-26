@@ -52,6 +52,7 @@ export async function buildWidgetSnapshot(): Promise<WidgetSnapshot> {
   };
 }
 
+/** Rebuild + persist + publish live stickies only when content changed / prefs on. */
 export async function refreshWidgetSnapshot(): Promise<WidgetSnapshot> {
   const snap = await buildWidgetSnapshot();
   await AsyncStorage.setItem(WIDGET_KEY, JSON.stringify(snap));
@@ -64,6 +65,16 @@ export async function refreshWidgetSnapshot(): Promise<WidgetSnapshot> {
   return snap;
 }
 
+/**
+ * Fresh snapshot for UI. Persists cache but does **not** republish OS stickies
+ * (avoids home-focus spam). Use `refreshWidgetSnapshot` after ledger/goal changes.
+ */
 export async function getWidgetSnapshot(): Promise<WidgetSnapshot> {
-  return refreshWidgetSnapshot();
+  const snap = await buildWidgetSnapshot();
+  try {
+    await AsyncStorage.setItem(WIDGET_KEY, JSON.stringify(snap));
+  } catch {
+    // ignore
+  }
+  return snap;
 }

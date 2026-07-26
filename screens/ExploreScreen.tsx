@@ -263,7 +263,7 @@ export default function ExploreScreen() {
           <Text style={styles.permissionTitle}>No inbox data yet</Text>
           <Text style={styles.permissionText}>
             {reason ||
-              'Permission is on, but we could not load financial SMS. A development build is required for real inbox access in Expo.'}
+              'Permission is on, but we could not load financial SMS. Try Paste SMS, or rebuild a preview APK if the native SMS module is missing.'}
           </Text>
           <TouchableOpacity
             style={styles.permissionButton}

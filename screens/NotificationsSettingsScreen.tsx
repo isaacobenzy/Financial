@@ -71,10 +71,10 @@ export default function NotificationsSettingsScreen() {
   const [token, setToken] = useState<string | null>(getCachedExpoPushToken());
   const [busy, setBusy] = useState(false);
   const [livePrefs, setLivePrefs] = useState<LiveSectionPrefs>({
-    overview: true,
-    balance: true,
-    goals: true,
-    streak: true,
+    overview: false,
+    balance: false,
+    goals: false,
+    streak: false,
   });
   const expoGo = isExpoGo();
   const pushSupported = supportsSystemNotifications();
