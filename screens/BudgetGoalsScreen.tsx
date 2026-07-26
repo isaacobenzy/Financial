@@ -2,8 +2,16 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
-const categories = [
+const categories: Array<{
+  id: string;
+  name: string;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  currentSpent: number;
+  budget: number;
+  color: string;
+}> = [
   {
     id: '1',
     name: 'Food & Dining',
@@ -39,9 +47,10 @@ const categories = [
 ];
 
 export default function BudgetGoalsScreen() {
+  const router = useRouter();
   const [selectedPeriod, setSelectedPeriod] = useState('monthly');
 
-  const renderProgressBar = (spent, budget) => {
+  const renderProgressBar = (spent: number, budget: number) => {
     const progress = Math.min((spent / budget) * 100, 100);
     const isOverBudget = spent > budget;
 
@@ -55,7 +64,11 @@ export default function BudgetGoalsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <MaterialCommunityIcons name="arrow-left" size={24} color="#333" />
+        </TouchableOpacity>
         <Text style={styles.title}>Budget Goals</Text>
+        <View style={{ width: 40 }} />
       </View>
 
       <View style={styles.periodSelector}>
@@ -109,11 +122,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     padding: 16,
     backgroundColor: '#fff',
   },
+  backButton: {
+    width: 40,
+  },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
   },

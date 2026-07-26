@@ -1,20 +1,86 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, PermissionsAndroid, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  PermissionsAndroid,
+  Platform,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import SmsAndroid from 'react-native-get-sms-android';
+import { useRouter } from 'expo-router';
+import { toast } from '@/lib/toast';
 
 type SMS = {
   id: string;
   address: string;
   body: string;
   date: string;
-  type: string;
 };
 
+const DEMO_MESSAGES: SMS[] = [
+  {
+    id: '1',
+    address: 'MTN MoMo',
+    body: 'Payment received GHS 250.00 from John Doe. Current Balance: GHS 1,240.50',
+    date: String(Date.now() - 86400000),
+  },
+  {
+    id: '2',
+    address: 'GCB Bank',
+    body: 'Debited GHS 45.00 at SUPERMARKET. Available bal: GHS 890.00',
+    date: String(Date.now() - 172800000),
+  },
+  {
+    id: '3',
+    address: 'Vodafone Cash',
+    body: 'You sent GHS 100.00 to 024XXXX123. Fee: GHS 1.00. Ref: TXN998877',
+    date: String(Date.now() - 259200000),
+  },
+];
+
 export default function ExploreScreen() {
-  const [messages, setMessages] = useState<SMS[]>([]);
-  const [hasPermission, setHasPermission] = useState(false);
+  const router = useRouter();
+  const [messages, setMessages] = useState<SMS[]>(DEMO_MESSAGES);
+  const [hasPermission, setHasPermission] = useState(Platform.OS !== 'android');
+  const [usingDemo, setUsingDemo] = useState(true);
+
+  const loadMessages = async () => {
+    if (Platform.OS !== 'android') {
+      setMessages(DEMO_MESSAGES);
+      setUsingDemo(true);
+      return;
+    }
+
+    try {
+      // Native SMS reader is not available in Expo Go; use demo data there.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const SmsAndroid = require('react-native-get-sms-android');
+      SmsAndroid.list(
+        JSON.stringify({
+          box: 'inbox',
+          bodyRegex: '(.*)(?:credited|debited|sent|received|payment|transaction)(.*)',
+        }),
+        (fail: string) => {
+          console.log('SMS load failed:', fail);
+          setMessages(DEMO_MESSAGES);
+          setUsingDemo(true);
+          toast.info('Using demo SMS messages');
+        },
+        (_count: number, smsList: string) => {
+          const arr = JSON.parse(smsList) as SMS[];
+          setMessages(arr.length ? arr : DEMO_MESSAGES);
+          setUsingDemo(!arr.length);
+        },
+      );
+    } catch {
+      setMessages(DEMO_MESSAGES);
+      setUsingDemo(true);
+      toast.info('SMS import needs a development build. Showing demo messages.');
+    }
+  };
 
   const requestReadSMSPermission = async () => {
     try {
@@ -27,36 +93,31 @@ export default function ExploreScreen() {
             buttonNeutral: 'Ask Me Later',
             buttonNegative: 'Cancel',
             buttonPositive: 'OK',
-          }
+          },
         );
-        setHasPermission(granted === PermissionsAndroid.RESULTS.GRANTED);
-        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-          loadMessages();
+        const ok = granted === PermissionsAndroid.RESULTS.GRANTED;
+        setHasPermission(ok);
+        if (ok) {
+          await loadMessages();
         }
+      } else {
+        setHasPermission(true);
+        await loadMessages();
       }
     } catch (err) {
       console.warn(err);
-    }
-  };
-
-  const loadMessages = () => {
-    if (Platform.OS === 'android') {
-      SmsAndroid.list(
-        JSON.stringify({
-          box: 'inbox',
-          bodyRegex: '(.*)(?:credited|debited|sent|received|payment|transaction)(.*)',
-        }),
-        (fail) => console.log('Failed with this error: ' + fail),
-        (count, smsList) => {
-          const arr = JSON.parse(smsList);
-          setMessages(arr);
-        },
-      );
+      setHasPermission(true);
+      setMessages(DEMO_MESSAGES);
+      setUsingDemo(true);
     }
   };
 
   useEffect(() => {
-    requestReadSMSPermission();
+    if (Platform.OS === 'android') {
+      requestReadSMSPermission();
+    } else {
+      setHasPermission(true);
+    }
   }, []);
 
   const renderItem = ({ item }: { item: SMS }) => (
@@ -67,7 +128,7 @@ export default function ExploreScreen() {
       </View>
       <Text style={styles.messageBody}>{item.body}</Text>
       <Text style={styles.messageDate}>
-        {new Date(parseInt(item.date)).toLocaleDateString()}
+        {new Date(parseInt(item.date, 10)).toLocaleDateString()}
       </Text>
     </View>
   );
@@ -75,7 +136,11 @@ export default function ExploreScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <MaterialCommunityIcons name="arrow-left" size={24} color="#333" />
+        </TouchableOpacity>
         <Text style={styles.title}>SMS Transactions</Text>
+        <View style={{ width: 40 }} />
       </View>
 
       {!hasPermission ? (
@@ -84,20 +149,34 @@ export default function ExploreScreen() {
           <Text style={styles.permissionText}>
             We need permission to read your SMS messages to analyze transactions
           </Text>
-          <TouchableOpacity
-            style={styles.permissionButton}
-            onPress={requestReadSMSPermission}
-          >
+          <TouchableOpacity style={styles.permissionButton} onPress={requestReadSMSPermission}>
             <Text style={styles.permissionButtonText}>Grant Permission</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.demoButton}
+            onPress={() => {
+              setHasPermission(true);
+              setMessages(DEMO_MESSAGES);
+              setUsingDemo(true);
+            }}
+          >
+            <Text style={styles.demoButtonText}>Continue with demo SMS</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <FlatList
-          data={messages}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
-        />
+        <>
+          {usingDemo ? (
+            <View style={styles.banner}>
+              <Text style={styles.bannerText}>Showing demo SMS transactions</Text>
+            </View>
+          ) : null}
+          <FlatList
+            data={messages}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.list}
+          />
+        </>
       )}
     </SafeAreaView>
   );
@@ -109,15 +188,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     padding: 16,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+  },
+  backButton: {
+    width: 40,
   },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
+  },
+  banner: {
+    backgroundColor: '#E8F1FF',
+    padding: 12,
+  },
+  bannerText: {
+    color: '#007AFF',
+    textAlign: 'center',
+    fontSize: 13,
+    fontWeight: '600',
   },
   list: {
     padding: 16,
@@ -133,6 +226,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    marginBottom: 12,
   },
   messageHeader: {
     flexDirection: 'row',
@@ -172,6 +266,14 @@ const styles = StyleSheet.create({
   permissionButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  demoButton: {
+    padding: 12,
+  },
+  demoButtonText: {
+    color: '#007AFF',
+    fontSize: 14,
     fontWeight: '600',
   },
 });

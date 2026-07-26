@@ -3,15 +3,11 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import { toast } from 'sonner-native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../types/navigation';
+import { useRouter } from 'expo-router';
+import { toast } from '@/lib/toast';
 
-type ImportPDFScreenProps = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'ImportPDF'>;
-};
-
-export default function ImportPDFScreen({ navigation }: ImportPDFScreenProps) {
+export default function ImportPDFScreen() {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
 
   const handlePDFPick = async () => {
@@ -22,15 +18,13 @@ export default function ImportPDFScreen({ navigation }: ImportPDFScreenProps) {
 
       if (!result.canceled) {
         setLoading(true);
-        // Here you would normally upload and process the PDF
-        // For demo purposes, we'll simulate processing
         setTimeout(() => {
           setLoading(false);
           toast.success('PDF processed successfully');
-          navigation.navigate('Transactions');
+          router.push('/transactions');
         }, 2000);
       }
-    } catch (err) {
+    } catch {
       toast.error('Failed to pick PDF');
     }
   };
@@ -38,7 +32,7 @@ export default function ImportPDFScreen({ navigation }: ImportPDFScreenProps) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity onPress={() => router.back()}>
           <MaterialCommunityIcons name="arrow-left" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.title}>Import PDF Statement</Text>
@@ -46,7 +40,7 @@ export default function ImportPDFScreen({ navigation }: ImportPDFScreenProps) {
       </View>
 
       <View style={styles.content}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.uploadArea}
           onPress={handlePDFPick}
           disabled={loading}
@@ -57,27 +51,10 @@ export default function ImportPDFScreen({ navigation }: ImportPDFScreenProps) {
             <>
               <MaterialCommunityIcons name="file-upload" size={48} color="#007AFF" />
               <Text style={styles.uploadText}>Tap to Upload PDF</Text>
-              <Text style={styles.supportedText}>
-                Supported: Bank Statements, Mobile Money Reports
-              </Text>
+              <Text style={styles.supportedText}>Supported: bank and mobile money PDFs</Text>
             </>
           )}
         </TouchableOpacity>
-
-        <View style={styles.infoSection}>
-          <View style={styles.infoItem}>
-            <MaterialCommunityIcons name="bank" size={24} color="#007AFF" />
-            <Text style={styles.infoText}>Supports major banks</Text>
-          </View>
-          <View style={styles.infoItem}>
-            <MaterialCommunityIcons name="shield-check" size={24} color="#007AFF" />
-            <Text style={styles.infoText}>Secure processing</Text>
-          </View>
-          <View style={styles.infoItem}>
-            <MaterialCommunityIcons name="eye-off" size={24} color="#007AFF" />
-            <Text style={styles.infoText}>Private & confidential</Text>
-          </View>
-        </View>
       </View>
     </SafeAreaView>
   );
@@ -90,8 +67,8 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     padding: 16,
     backgroundColor: '#fff',
   },
@@ -102,43 +79,27 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: 24,
+    justifyContent: 'center',
   },
   uploadArea: {
     backgroundColor: '#fff',
     borderRadius: 16,
-    padding: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#e0e0e0',
+    borderColor: '#007AFF',
     borderStyle: 'dashed',
-    marginBottom: 24,
+    padding: 48,
+    alignItems: 'center',
+    gap: 12,
   },
   uploadText: {
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
-    marginTop: 16,
   },
   supportedText: {
     fontSize: 14,
     color: '#666',
-    marginTop: 8,
-  },
-  infoSection: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
-    gap: 16,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  infoText: {
-    fontSize: 16,
-    color: '#333',
+    textAlign: 'center',
   },
 });

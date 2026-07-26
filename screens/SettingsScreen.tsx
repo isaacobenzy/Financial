@@ -1,13 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../types/navigation';
-
-type SettingsScreenProps = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'Settings'>;
-};
+import { useRouter } from 'expo-router';
+import { toast } from '@/lib/toast';
 
 type SettingSection = {
   title: string;
@@ -16,53 +12,79 @@ type SettingSection = {
     icon: keyof typeof MaterialCommunityIcons.glyphMap;
     label: string;
     onPress: () => void;
-    switch?: {
-      value: boolean;
-      onValueChange: (value: boolean) => void;
-    };
   }>;
 };
 
-const settingsOptions: SettingSection[] = [
-  {
-    title: 'Account',
-    description: 'Manage your profile and security settings',
-    items: [
-      {
-        icon: 'account-circle-outline',
-        label: 'Profile Information',
-        onPress: () => {},
-      },
-      {
-        icon: 'shield-lock-outline',
-        label: 'Security',
-        onPress: () => {},
-      },
-    ],
-  },
-  // ... rest of your sections
-];
+export default function SettingsScreen() {
+  const router = useRouter();
 
-export default function SettingsScreen({ navigation }: SettingsScreenProps) {
+  const settingsOptions: SettingSection[] = [
+    {
+      title: 'Account',
+      description: 'Manage your profile and security settings',
+      items: [
+        {
+          icon: 'account-circle-outline',
+          label: 'Profile Information',
+          onPress: () => toast.info('Profile coming soon'),
+        },
+        {
+          icon: 'shield-lock-outline',
+          label: 'Security',
+          onPress: () => toast.info('Security settings coming soon'),
+        },
+      ],
+    },
+    {
+      title: 'Finance',
+      description: 'Budgets and transaction tools',
+      items: [
+        {
+          icon: 'target',
+          label: 'Budget Goals',
+          onPress: () => router.push('/budget-goals'),
+        },
+        {
+          icon: 'swap-horizontal',
+          label: 'Transactions',
+          onPress: () => router.push('/transactions'),
+        },
+      ],
+    },
+    {
+      title: 'Session',
+      items: [
+        {
+          icon: 'logout',
+          label: 'Log out',
+          onPress: () => router.replace('/login'),
+        },
+      ],
+    },
+  ];
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <MaterialCommunityIcons name="arrow-left" size={24} color="#333" />
+        </TouchableOpacity>
         <Text style={styles.title}>Settings</Text>
+        <View style={{ width: 40 }} />
       </View>
-
       <ScrollView style={styles.content}>
-        {settingsOptions.map((section, index) => (
+        {settingsOptions.map((section) => (
           <View key={section.title} style={styles.section}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
-            {section.description && (
+            {section.description ? (
               <Text style={styles.sectionDescription}>{section.description}</Text>
-            )}
+            ) : null}
             {section.items.map((item, itemIndex) => (
-              <TouchableOpacity 
+              <TouchableOpacity
                 key={item.label}
                 style={[
                   styles.settingItem,
-                  itemIndex === section.items.length - 1 && styles.lastItem
+                  itemIndex === section.items.length - 1 && styles.lastItem,
                 ]}
                 onPress={item.onPress}
               >
@@ -93,11 +115,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     padding: 16,
     backgroundColor: '#fff',
   },
+  backButton: {
+    width: 40,
+  },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
   },
@@ -152,11 +180,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
-  },
-  settingDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 2,
   },
   appInfo: {
     padding: 24,

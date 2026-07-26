@@ -1,19 +1,10 @@
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-
 export type RootStackParamList = {
-  Onboarding: undefined;
-  Login: undefined;
-  MainTabs: undefined;
-  Settings: undefined;
-  Transactions: undefined;
-  ImportSMS: undefined;
-  ImportPDF: undefined;
-  BudgetGoals: undefined;
-  Explore: undefined;  // Add this line
-};
-
-export type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
-
-export type NavigationProps = {
-  navigation: NativeStackNavigationProp<RootStackParamList, keyof RootStackParamList>;
+  onboarding: undefined;
+  login: undefined;
+  '(tabs)': undefined;
+  settings: undefined;
+  transactions: undefined;
+  explore: undefined;
+  'import-pdf': undefined;
+  'budget-goals': undefined;
 };

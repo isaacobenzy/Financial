@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { toast } from 'sonner-native';
-import { NavigationProps } from '../types/navigation';
+import { useRouter } from 'expo-router';
+import { toast } from '@/lib/toast';
 
-export default function SignupScreen({ navigation }: NavigationProps) {
+export default function SignupScreen() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -15,9 +16,8 @@ export default function SignupScreen({ navigation }: NavigationProps) {
       toast.error('Passwords do not match');
       return;
     }
-    // For demo purposes
     toast.info('This is a demo app. Please use demo credentials.');
-    navigation.navigate('Login');
+    router.push('/login');
   };
 
   return (
@@ -58,7 +58,7 @@ export default function SignupScreen({ navigation }: NavigationProps) {
 
         <TouchableOpacity 
           style={styles.loginButton} 
-          onPress={() => navigation.navigate('Login')}
+          onPress={() => router.push('/login')}
         >
           <Text style={styles.loginButtonText}>
             Already have an account? Login

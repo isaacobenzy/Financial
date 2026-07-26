@@ -1,9 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { NavigationProp, RootStackParamList } from '../types/navigation';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useRouter } from 'expo-router';
 
 type Feature = {
   icon: 'chart-line' | 'robot-happy' | 'file-document';
@@ -29,11 +28,9 @@ const features: Feature[] = [
   },
 ];
 
-type OnboardingScreenProps = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'Onboarding'>;
-};
+export default function OnboardingScreen() {
+  const router = useRouter();
 
-export default function OnboardingScreen({ navigation }: OnboardingScreenProps) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -42,8 +39,8 @@ export default function OnboardingScreen({ navigation }: OnboardingScreenProps) 
       </View>
 
       <View style={styles.features}>
-        {features.map((feature, index) => (
-          <View key={index} style={styles.featureItem}>
+        {features.map((feature) => (
+          <View key={feature.title} style={styles.featureItem}>
             <MaterialCommunityIcons name={feature.icon} size={32} color="#007AFF" />
             <View style={styles.featureContent}>
               <Text style={styles.featureTitle}>{feature.title}</Text>
@@ -54,9 +51,9 @@ export default function OnboardingScreen({ navigation }: OnboardingScreenProps) 
       </View>
 
       <View style={styles.actions}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.getStartedButton}
-          onPress={() => navigation.navigate('Login')}
+          onPress={() => router.push('/login')}
         >
           <Text style={styles.getStartedText}>Get Started</Text>
         </TouchableOpacity>

@@ -2,8 +2,11 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 export default function ImportScreen() {
+  const router = useRouter();
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -11,7 +14,7 @@ export default function ImportScreen() {
       </View>
 
       <View style={styles.content}>
-        <TouchableOpacity style={styles.importOption}>
+        <TouchableOpacity style={styles.importOption} onPress={() => router.push('/explore')}>
           <MaterialCommunityIcons name="message-text" size={32} color="#007AFF" />
           <Text style={styles.optionTitle}>Import SMS</Text>
           <Text style={styles.optionDescription}>
@@ -19,7 +22,7 @@ export default function ImportScreen() {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.importOption}>
+        <TouchableOpacity style={styles.importOption} onPress={() => router.push('/import-pdf')}>
           <MaterialCommunityIcons name="file-pdf-box" size={32} color="#007AFF" />
           <Text style={styles.optionTitle}>Upload Statement</Text>
           <Text style={styles.optionDescription}>
@@ -30,7 +33,8 @@ export default function ImportScreen() {
         <View style={styles.infoBox}>
           <MaterialCommunityIcons name="information" size={24} color="#666" />
           <Text style={styles.infoText}>
-            Your data is encrypted and stored securely on your device. We never share your financial information with third parties.
+            Your data is encrypted and stored securely on your device. We never share your
+            financial information with third parties.
           </Text>
         </View>
       </View>
@@ -81,15 +85,16 @@ const styles = StyleSheet.create({
   },
   infoBox: {
     flexDirection: 'row',
+    gap: 12,
     backgroundColor: '#fff',
     padding: 16,
     borderRadius: 12,
-    alignItems: 'center',
-    gap: 12,
+    alignItems: 'flex-start',
   },
   infoText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
+    lineHeight: 18,
   },
 });

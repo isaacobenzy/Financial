@@ -1,21 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { toast } from 'sonner-native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../types/navigation';
+import { useRouter } from 'expo-router';
+import { toast } from '@/lib/toast';
 
 const DEMO_CREDENTIALS = {
   email: 'demo@financialcopilot.com',
-  password: 'demo123'
+  password: 'demo123',
 };
 
-type LoginScreenProps = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'Login'>;
-};
-
-export default function LoginScreen({ navigation }: LoginScreenProps) {
+export default function LoginScreen() {
+  const router = useRouter();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -23,13 +19,12 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
   const handleAuth = () => {
     if (isLogin) {
       if (email === DEMO_CREDENTIALS.email && password === DEMO_CREDENTIALS.password) {
-        navigation.replace('MainTabs');
         toast.success('Welcome back!');
+        router.replace('/(tabs)/assistant');
       } else {
         toast.error('Invalid credentials');
       }
     } else {
-      // For demo, we'll just show a message
       toast.info('This is a demo app. Please use demo credentials.');
     }
   };
@@ -65,19 +60,14 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
         />
 
         <TouchableOpacity style={styles.authButton} onPress={handleAuth}>
-          <Text style={styles.authButtonText}>
-            {isLogin ? 'Login' : 'Sign Up'}
-          </Text>
+          <Text style={styles.authButtonText}>{isLogin ? 'Login' : 'Sign Up'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.demoButton} onPress={handleDemoLogin}>
           <Text style={styles.demoButtonText}>Use Demo Credentials</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.switchButton} 
-          onPress={() => setIsLogin(!isLogin)}
-        >
+        <TouchableOpacity style={styles.switchButton} onPress={() => setIsLogin(!isLogin)}>
           <Text style={styles.switchButtonText}>
             {isLogin ? "Don't have an account? Sign Up" : 'Already have an account? Login'}
           </Text>
