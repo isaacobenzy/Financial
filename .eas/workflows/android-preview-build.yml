@@ -15,8 +15,7 @@ concurrency:
 
 defaults:
   tools:
-    node: '20'
-    pnpm: '10'
+    node: '20.19.4'
 
 jobs:
   build_android_preview:

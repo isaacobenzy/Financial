@@ -109,13 +109,13 @@ constants/theme.ts   Cedar / sage / brass design tokens
 
 ### Requirements
 - Node **≥ 20.19.4**
-- pnpm (recommended)
+- npm (ships with Node; CI and EAS use `package-lock.json`)
 - Expo Go **or** Android/iOS toolchain for a dev build
 
 ### Install
 
 ```bash
-pnpm install
+npm install
 ```
 
 ### Environment
@@ -128,25 +128,24 @@ EXPO_PUBLIC_OPENROUTER_API_KEY=sk-or-v1-your-key-here
 # EXPO_PUBLIC_OPENROUTER_MODEL=meta-llama/llama-3.2-3b-instruct
 ```
 
-Restart Expo after changing `.env` (`pnpm start -- --clear`).
+Restart Expo after changing `.env` (`npm start -- --clear`).
 
 **Never commit** `.env` or real API keys.
 
 ### Run
 
 ```bash
-pnpm start
+npm start
 # or clear cache:
-pnpm start -- --clear
+npm start -- --clear
 ```
 
 Then open in Expo Go, or:
 
 ```bash
-pnpm android   # expo run:android — needed for real SMS inbox
-pnpm ios
+npm run android   # expo run:android — needed for real SMS inbox
+npm run ios
 ```
-
 ---
 
 ## Permissions matrix
@@ -166,15 +165,15 @@ Configured in `app.json`.
 
 | Command | Purpose |
 |---------|---------|
-| `pnpm start` | Start Metro / Expo |
-| `pnpm android` / `pnpm ios` | Native run |
-| `pnpm export:web` | Static web export → `dist/` |
-| `pnpm deploy:web` | Export + [EAS Hosting](https://docs.expo.dev/eas/hosting/get-started/) deploy |
-| `pnpm build:android:preview` | [Internal Android APK](https://docs.expo.dev/tutorial/eas/internal-distribution-builds/) |
-| `pnpm typecheck` | TypeScript |
-| `pnpm lint` | ESLint |
-| `pnpm test` / `pnpm test:ci` | Jest |
-| `pnpm doctor` | expo-doctor |
+| `npm start` | Start Metro / Expo |
+| `npm run android` / `npm run ios` | Native run |
+| `npm run export:web` | Static web export → `dist/` |
+| `npm run deploy:web` | Export + [EAS Hosting](https://docs.expo.dev/eas/hosting/get-started/) deploy |
+| `npm run build:android:preview` | [Internal Android APK](https://docs.expo.dev/tutorial/eas/internal-distribution-builds/) |
+| `npm run typecheck` | TypeScript |
+| `npm run lint` | ESLint |
+| `npm test` / `npm run test:ci` | Jest |
+| `npm run doctor` | expo-doctor |
 
 ---
 
@@ -185,7 +184,7 @@ You do **not** need an Apple Developer account for Android APKs or the web previ
 ### 1. Link the EAS project (once)
 
 ```bash
-pnpm add --global eas-cli   # or: npx eas-cli@latest
+npm install -g eas-cli   # or: npx eas-cli@latest
 eas login
 eas init                    # writes expo.extra.eas.projectId into app.json
 ```
@@ -197,9 +196,9 @@ Commit the updated `app.json` (with `projectId`). Add a GitHub secret `EXPO_TOKE
 Same flow BetLive uses for testers ([internal distribution](https://docs.expo.dev/tutorial/eas/internal-distribution-builds/)):
 
 ```bash
-pnpm build:android:preview          # shareable APK (no Metro needed)
+npm run build:android:preview          # shareable APK (no Metro needed)
 # optional JS-only updates after they install once:
-pnpm update:preview -- "Fix goals toast"
+npm run update:preview -- "Fix goals toast"
 ```
 
 When the build finishes: EAS dashboard → **Install** / QR → share that link.  
@@ -210,7 +209,7 @@ EAS Workflows (repo): `.eas/workflows/android-preview-build.yml`, `publish-previ
 ### 3. Web preview URL (EAS Hosting)
 
 ```bash
-pnpm deploy:web
+npm run deploy:web
 ```
 
 You get a URL like `https://your-app.expo.app/` ([EAS Hosting](https://docs.expo.dev/eas/hosting/get-started/)). GitHub: **EAS Web Hosting** workflow.
