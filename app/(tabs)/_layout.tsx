@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
     paddingTop: 2,
   },
   label: {
-    fontSize: Platform.OS === 'web' ? 11 : 11,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.2,
     marginTop: 1,

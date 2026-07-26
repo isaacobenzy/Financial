@@ -106,6 +106,7 @@ export default function AssistantScreen() {
   }, [keyboardVisible, windowHeight]);
 
   useEffect(() => {
+    // Ease the composer in above the floating tab / system nav when chat opens.
     Animated.spring(composerEnter, {
       toValue: 0,
       speed: 18,
@@ -122,6 +123,8 @@ export default function AssistantScreen() {
 
     const onShow = (e: { duration?: number; endCoordinates: { height: number } }) => {
       setKeyboardVisible(true);
+      // Ease composer above the system nav / home indicator as the keyboard rises.
+      // Android uses softwareKeyboardLayoutMode=resize, so we only animate a light lift.
       const lift = Platform.OS === 'ios' ? 0 : Math.min(8, Math.max(0, e.endCoordinates.height * 0.02));
       Animated.timing(composerLift, {
         toValue: lift,
