@@ -1,3 +1,6 @@
-import BudgetGoalsScreen from '@/screens/BudgetGoalsScreen';
+import { Redirect } from 'expo-router';
 
-export default BudgetGoalsScreen;
+/** Legacy route — Goals now live in the Goals tab. */
+export default function BudgetGoalsRedirect() {
+  return <Redirect href="/(tabs)/goals" />;
+}

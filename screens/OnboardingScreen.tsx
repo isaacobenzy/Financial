@@ -3,28 +3,30 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import NaviiAvatar from '@/components/NaviiAvatar';
+import { theme } from '@/constants/theme';
 
 type Feature = {
-  icon: 'chart-line' | 'robot-happy' | 'file-document';
+  icon: 'wallet-outline' | 'bullseye-arrow' | 'shield-lock-outline';
   title: string;
   description: string;
 };
 
 const features: Feature[] = [
   {
-    icon: 'chart-line',
-    title: 'Track Expenses',
-    description: 'Monitor your spending habits and track expenses in real-time',
+    icon: 'wallet-outline',
+    title: 'Private ledger',
+    description: 'Hide balances, import SMS or paste alerts on-device',
   },
   {
-    icon: 'robot-happy',
-    title: 'AI Assistant',
-    description: 'Get personalized financial advice from our AI assistant',
+    icon: 'bullseye-arrow',
+    title: 'Financial goals',
+    description: 'Set monthly targets and track progress clearly',
   },
   {
-    icon: 'file-document',
-    title: 'Import Statements',
-    description: 'Easily import bank statements and SMS notifications',
+    icon: 'shield-lock-outline',
+    title: 'Biometric unlock',
+    description: 'Face ID or fingerprint to open your account',
   },
 ];
 
@@ -34,14 +36,17 @@ export default function OnboardingScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <MaterialCommunityIcons name="finance" size={64} color="#007AFF" />
+        <NaviiAvatar seed="financial-copilot-welcome" size={96} mood="wink" />
         <Text style={styles.title}>Welcome to{'\n'}Financial Copilot</Text>
+        <Text style={styles.caption}>Private ledger, goals, and grounded AI guidance</Text>
       </View>
 
       <View style={styles.features}>
         {features.map((feature) => (
           <View key={feature.title} style={styles.featureItem}>
-            <MaterialCommunityIcons name={feature.icon} size={32} color="#007AFF" />
+            <View style={styles.featureIcon}>
+              <MaterialCommunityIcons name={feature.icon} size={22} color={theme.colors.cedar} />
+            </View>
             <View style={styles.featureContent}>
               <Text style={styles.featureTitle}>{feature.title}</Text>
               <Text style={styles.featureDescription}>{feature.description}</Text>
@@ -51,11 +56,9 @@ export default function OnboardingScreen() {
       </View>
 
       <View style={styles.actions}>
-        <TouchableOpacity
-          style={styles.getStartedButton}
-          onPress={() => router.push('/login')}
-        >
-          <Text style={styles.getStartedText}>Get Started</Text>
+        <TouchableOpacity style={styles.getStartedButton} onPress={() => router.push('/login')}>
+          <Text style={styles.getStartedText}>Get started</Text>
+          <MaterialCommunityIcons name="arrow-right" size={18} color={theme.colors.white} />
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -65,54 +68,77 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.paper,
   },
   header: {
     alignItems: 'center',
-    padding: 48,
+    padding: 40,
   },
   title: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '700',
+    color: theme.colors.ink,
     textAlign: 'center',
-    marginTop: 24,
+    marginTop: 20,
+  },
+  caption: {
+    marginTop: 10,
+    fontSize: 14,
+    color: theme.colors.muted,
+    textAlign: 'center',
   },
   features: {
-    padding: 24,
-    gap: 24,
+    paddingHorizontal: 24,
+    gap: 14,
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 14,
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.radius.md,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: theme.colors.line,
+  },
+  featureIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: theme.colors.sage,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   featureContent: {
     flex: 1,
   },
   featureTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.colors.ink,
+    marginBottom: 2,
   },
   featureDescription: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 13,
+    color: theme.colors.muted,
+    lineHeight: 18,
   },
   actions: {
     padding: 24,
     marginTop: 'auto',
   },
   getStartedButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: theme.colors.cedar,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: theme.radius.md,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
   },
   getStartedText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+    color: theme.colors.white,
+    fontSize: 17,
+    fontWeight: '700',
   },
 });

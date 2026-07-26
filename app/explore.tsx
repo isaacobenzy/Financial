@@ -1,3 +1,6 @@
-import ExploreScreen from '@/screens/ExploreScreen';
+import { Redirect } from 'expo-router';
 
-export default ExploreScreen;
+/** Legacy path — Import SMS lives at /import-sms */
+export default function ExploreRedirect() {
+  return <Redirect href="/import-sms" />;
+}

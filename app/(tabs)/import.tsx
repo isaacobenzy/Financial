@@ -1,3 +1,6 @@
-import ImportScreen from '@/screens/ImportScreen';
+import { Redirect } from 'expo-router';
 
-export default ImportScreen;
+/** Hidden tab stub — use /import-sms stack route. */
+export default function ImportTabRedirect() {
+  return <Redirect href="/import-sms" />;
+}
