@@ -189,7 +189,9 @@ eas login
 eas init                    # writes expo.extra.eas.projectId into app.json
 ```
 
-Commit the updated `app.json` (with `projectId`). Add a GitHub secret `EXPO_TOKEN` from [expo.dev/settings/access-tokens](https://expo.dev/settings/access-tokens).
+Commit the updated `app.json` (with `projectId`). Connect the GitHub repo in the [Expo dashboard](https://expo.dev) so **EAS Workflows** can run (builds + web deploy **without** a GitHub `EXPO_TOKEN`).
+
+Optional: add a GitHub Actions secret `EXPO_TOKEN` only if you want the manual **Deploy Web (optional)** / **EAS Build (optional)** workflows.
 
 ### 2. Android install link (BetLive-style internal distribution)
 
@@ -240,22 +242,15 @@ jobs:
       alias: preview
 ```
 
-**B. GitHub Actions** ([`.github/workflows/deploy-web.yml`](.github/workflows/deploy-web.yml)) — uses `EXPO_TOKEN`:
+**B. GitHub Actions** ([`.github/workflows/deploy-web.yml`](.github/workflows/deploy-web.yml)) — **optional / manual only**, needs repo secret `EXPO_TOKEN`:
 
-1. Push to `main` / `staging` (or manual `workflow_dispatch`)
+1. Manual `workflow_dispatch`
 2. Checkout
 3. Authenticate EAS CLI via `expo/expo-github-action` + `secrets.EXPO_TOKEN`
-4. `pnpm export:web` → `expo export --platform web` (static site in `dist/`)
-5. `eas deploy --non-interactive` → upload to EAS Hosting and emit a preview URL (not production unless `main` / `--prod`)
+4. `pnpm export:web` → static site in `dist/`
+5. `eas deploy --non-interactive` → preview URL
 
-Locally the same flow:
-
-```bash
-pnpm deploy:web:preview   # → https://<subdomain>--preview.expo.app/
-pnpm deploy:web:prod      # → https://<subdomain>.expo.app/
-```
-
-Without `EXPO_TOKEN`, the **Actions** job cannot authenticate. **EAS Workflows** do not need that secret because they already run as the linked Expo project.
+Note: Expo project linkage ≠ GitHub Actions secret. If Actions logs show `EXPO_TOKEN` empty, either add that secret under **Repo → Settings → Secrets → Actions**, or rely on EAS Workflows (A) which do not need it.
 
 #### Related (not web hosting)
 
