@@ -1,59 +1,113 @@
-import React from 'react';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Link, Tabs } from 'expo-router';
-import { Pressable } from 'react-native';
+import type { ComponentProps } from 'react';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
+import { Platform, StyleSheet, View } from 'react-native';
+import { theme } from '@/constants/theme';
+import { haptic } from '@/lib/haptics';
 
-import Colors from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
-
-// You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
-function TabBarIcon(props: {
-  name: React.ComponentProps<typeof FontAwesome>['name'];
-  color: string;
+function TabIcon({
+  name,
+  focused,
+}: {
+  name: ComponentProps<typeof MaterialCommunityIcons>['name'];
+  focused: boolean;
 }) {
-  return <FontAwesome size={28} style={{ marginBottom: -3 }} {...props} />;
+  return (
+    <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
+      <MaterialCommunityIcons
+        name={name}
+        size={22}
+        color={focused ? theme.colors.white : theme.colors.tabInactive}
+      />
+    </View>
+  );
 }
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <Tabs
+      initialRouteName="index"
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        // Disable the static render of the header on web
-        // to prevent a hydration error in React Navigation v6.
-        headerShown: useClientOnlyValue(false, true),
-      }}>
+        headerShown: false,
+        tabBarShowLabel: true,
+        tabBarActiveTintColor: theme.colors.cedar,
+        tabBarInactiveTintColor: theme.colors.tabInactive,
+        tabBarLabelStyle: styles.label,
+        tabBarStyle: styles.tabBar,
+        tabBarItemStyle: styles.tabItem,
+      }}
+      screenListeners={{
+        tabPress: () => {
+          void haptic('selection');
+        },
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Tab One',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
-          headerRight: () => (
-            <Link href="/modal" asChild>
-              <Pressable>
-                {({ pressed }) => (
-                  <FontAwesome
-                    name="info-circle"
-                    size={25}
-                    color={Colors[colorScheme ?? 'light'].text}
-                    style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
-                  />
-                )}
-              </Pressable>
-            </Link>
+          title: 'Home',
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name={focused ? 'home-variant' : 'home-variant-outline'} focused={focused} />
           ),
         }}
       />
       <Tabs.Screen
-        name="two"
+        name="goals"
         options={{
-          title: 'Tab Two',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
+          title: 'Goals',
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name={focused ? 'bullseye-arrow' : 'bullseye'} focused={focused} />
+          ),
         }}
       />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Settings',
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name={focused ? 'cog' : 'cog-outline'} focused={focused} />
+          ),
+        }}
+      />
+      {/* Hidden legacy routes — open via stack / Home AI button */}
+      <Tabs.Screen name="assistant" options={{ href: null }} />
+      <Tabs.Screen name="import" options={{ href: null }} />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: Platform.OS === 'ios' ? 24 : 16,
+    height: 72,
+    borderRadius: 28,
+    backgroundColor: theme.colors.white,
+    borderTopWidth: 0,
+    paddingTop: 8,
+    paddingBottom: 10,
+    ...theme.shadow.soft,
+    shadowOpacity: 0.14,
+    elevation: 10,
+  },
+  tabItem: {
+    paddingTop: 4,
+  },
+  label: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  iconWrap: {
+    width: 42,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconWrapActive: {
+    backgroundColor: theme.colors.cedar,
+  },
+});

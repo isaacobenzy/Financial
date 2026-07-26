@@ -1,41 +1,31 @@
 {
   "cli": {
-    "version": ">= 5.9.1"
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
       "developmentClient": true,
       "distribution": "internal",
       "android": {
-        "buildType": "apk",
-        "gradleCommand": ":app:assembleDebug",
-        "kotlinVersion": "1.8.0"
-      },
-      "env": {
-        "ANDROID_SDK_ROOT": "C:\\Users\\obeng\\AppData\\Local\\Android\\Sdk",
-        "ANDROID_HOME": "C:\\Users\\obeng\\AppData\\Local\\Android\\Sdk"
+        "buildType": "apk"
       }
     },
     "preview": {
       "distribution": "internal",
+      "channel": "preview",
       "android": {
-        "buildType": "apk",
-        "kotlinVersion": "1.8.0"
-      },
-      "env": {
-        "ANDROID_SDK_ROOT": "C:\\Users\\obeng\\AppData\\Local\\Android\\Sdk",
-        "ANDROID_HOME": "C:\\Users\\obeng\\AppData\\Local\\Android\\Sdk"
+        "buildType": "apk"
       }
     },
     "production": {
+      "channel": "production",
       "android": {
-        "buildType": "apk",
-        "kotlinVersion": "1.8.0"
-      },
-      "env": {
-        "ANDROID_SDK_ROOT": "C:\\Users\\obeng\\AppData\\Local\\Android\\Sdk",
-        "ANDROID_HOME": "C:\\Users\\obeng\\AppData\\Local\\Android\\Sdk"
+        "buildType": "app-bundle"
       }
     }
+  },
+  "submit": {
+    "production": {}
   }
 }

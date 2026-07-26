@@ -1,57 +1,18 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-
-// Add these type definitions at the top
-type Transaction = {
-  id: string;
-  type: 'income' | 'expense';
-  category: keyof CategoryIcons;
-  merchant: string;
-  amount: number;
-  date: string;
-};
+import { useFocusEffect } from 'expo-router';
+import { getAllTransactions, type Transaction } from '@/lib/financeContext';
+import { theme } from '@/constants/theme';
 
 type CategoryIcons = {
-  shopping: 'cart' | 'shopping';
+  shopping: 'cart';
   salary: 'cash';
   transport: 'car';
   food: 'food';
   utilities: 'lightning-bolt';
   entertainment: 'movie';
   other: 'dots-horizontal';
-};
-
-// Update the mock data to use the correct icon names
-const mockTransactions: Transaction[] = [
-  {
-    id: '1',
-    type: 'expense',
-    category: 'shopping',
-    merchant: 'Shoprite',
-    amount: -250.00,
-    date: '2024-03-29',
-  },
-  {
-    id: '2',
-    type: 'income',
-    category: 'salary',
-    merchant: 'Employer Ltd',
-    amount: 5000.00,
-    date: '2024-03-28',
-  },
-  {
-    id: '3',
-    type: 'expense',
-    category: 'transport',
-    merchant: 'Uber',
-    amount: -45.00,
-    date: '2024-03-28',
-  },
-];
-
-type CategoryColors = {
-  [K in keyof CategoryIcons]: string;
 };
 
 const categoryIcons: CategoryIcons = {
@@ -61,81 +22,116 @@ const categoryIcons: CategoryIcons = {
   food: 'food',
   utilities: 'lightning-bolt',
   entertainment: 'movie',
-  other: 'dots-horizontal'
-};
-
-const categoryColors: CategoryColors = {
-  shopping: '#FF6B6B',
-  salary: '#51CF66',
-  transport: '#339AF0',
-  food: '#FAB005',
-  utilities: '#845EF7',
-  entertainment: '#FF922B',
-  other: '#868E96'
+  other: 'dots-horizontal',
 };
 
 export default function TransactionCard() {
-  // Update the getCategoryIcon function
-  const getCategoryIcon = (category: keyof CategoryIcons) => {
-    return categoryIcons[category] || categoryIcons.other;
-  };
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
 
-  const getCategoryColor = (category: keyof CategoryColors) => {
-    return categoryColors[category] || categoryColors.other;
-  };
+  useFocusEffect(
+    useCallback(() => {
+      getAllTransactions().then((list) => setTransactions(list.slice(0, 8)));
+    }, []),
+  );
+
+  const getIcon = (category: string) =>
+    categoryIcons[category as keyof CategoryIcons] ?? categoryIcons.other;
+
+  if (!transactions.length) {
+    return (
+      <View style={[styles.container, styles.empty]}>
+        <Text style={styles.emptyText}>No transactions yet — import SMS to fill your ledger.</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      {mockTransactions.map((transaction) => (
-        <View key={transaction.id} style={styles.transaction}>
-          <View style={styles.iconContainer}>
-            <MaterialCommunityIcons 
-              name={getCategoryIcon(transaction.category)} 
-              size={24} 
-              color={transaction.type === 'income' ? '#4CAF50' : '#F44336'} 
-            />
+      {transactions.map((transaction, index) => {
+        const rowKey = `row-${index}-${transaction.id}-${transaction.merchant}-${transaction.amount}`;
+        return (
+          <View
+            key={rowKey}
+            style={[
+              styles.transaction,
+              index === transactions.length - 1 && styles.transactionLast,
+            ]}
+          >
+            <View
+              style={[
+                styles.iconContainer,
+                {
+                  backgroundColor:
+                    transaction.type === 'income'
+                      ? 'rgba(82,183,136,0.15)'
+                      : 'rgba(231,111,81,0.12)',
+                },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name={getIcon(transaction.category)}
+                size={22}
+                color={transaction.type === 'income' ? theme.colors.mint : theme.colors.coral}
+              />
+            </View>
+
+            <View style={styles.details}>
+              <Text style={styles.merchant}>{transaction.merchant}</Text>
+              <Text style={styles.date}>{transaction.date}</Text>
+            </View>
+
+            <Text
+              style={[
+                styles.amount,
+                {
+                  color:
+                    transaction.type === 'income' ? theme.colors.mint : theme.colors.coral,
+                },
+              ]}
+            >
+              {transaction.type === 'income' ? '+' : ''}
+              {transaction.amount.toFixed(2)}
+            </Text>
           </View>
-          
-          <View style={styles.details}>
-            <Text style={styles.merchant}>{transaction.merchant}</Text>
-            <Text style={styles.date}>{transaction.date}</Text>
-          </View>
-          
-          <Text style={[
-            styles.amount,
-            { color: transaction.type === 'income' ? '#4CAF50' : '#F44336' }
-          ]}>
-            {transaction.type === 'income' ? '+' : ''}{transaction.amount.toFixed(2)}
-          </Text>
-        </View>
-      ))}
+        );
+      })}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.radius.lg,
     marginHorizontal: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: theme.colors.line,
+    ...theme.shadow.soft,
+  },
+  empty: {
+    padding: 20,
+  },
+  emptyText: {
+    color: theme.colors.muted,
+    fontSize: 13,
+    textAlign: 'center',
   },
   transaction: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.colors.line,
+  },
+  transactionLast: {
+    borderBottomWidth: 0,
   },
   iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f5f5f5',
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -144,17 +140,17 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   merchant: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.colors.ink,
   },
   date: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.muted,
     marginTop: 2,
   },
   amount: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

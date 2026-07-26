@@ -3,34 +3,39 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import { toast } from 'sonner-native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../types/navigation';
+import { useRouter } from 'expo-router';
+import { toast } from '@/lib/toast';
+import { theme } from '@/constants/theme';
+import { haptic } from '@/lib/haptics';
 
-type ImportPDFScreenProps = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'ImportPDF'>;
-};
-
-export default function ImportPDFScreen({ navigation }: ImportPDFScreenProps) {
+export default function ImportPDFScreen() {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
+
+  const leave = () => {
+    void haptic('selection');
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)/settings');
+  };
 
   const handlePDFPick = async () => {
     try {
+      await haptic('selection');
       const result = await DocumentPicker.getDocumentAsync({
         type: 'application/pdf',
       });
 
       if (!result.canceled) {
         setLoading(true);
-        // Here you would normally upload and process the PDF
-        // For demo purposes, we'll simulate processing
-        setTimeout(() => {
+        setTimeout(async () => {
           setLoading(false);
+          await haptic('success');
           toast.success('PDF processed successfully');
-          navigation.navigate('Transactions');
+          router.replace('/transactions');
         }, 2000);
       }
-    } catch (err) {
+    } catch {
+      await haptic('error');
       toast.error('Failed to pick PDF');
     }
   };
@@ -38,46 +43,31 @@ export default function ImportPDFScreen({ navigation }: ImportPDFScreenProps) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#333" />
+        <TouchableOpacity onPress={leave} accessibilityLabel="Close">
+          <MaterialCommunityIcons name="arrow-left" size={24} color={theme.colors.ink} />
         </TouchableOpacity>
-        <Text style={styles.title}>Import PDF Statement</Text>
+        <Text style={styles.title}>Import PDF</Text>
         <View style={{ width: 24 }} />
       </View>
 
       <View style={styles.content}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.uploadArea}
           onPress={handlePDFPick}
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator size="large" color="#007AFF" />
+            <ActivityIndicator size="large" color={theme.colors.cedar} />
           ) : (
             <>
-              <MaterialCommunityIcons name="file-upload" size={48} color="#007AFF" />
-              <Text style={styles.uploadText}>Tap to Upload PDF</Text>
-              <Text style={styles.supportedText}>
-                Supported: Bank Statements, Mobile Money Reports
-              </Text>
+              <View style={styles.iconBadge}>
+                <MaterialCommunityIcons name="file-upload-outline" size={36} color={theme.colors.cedar} />
+              </View>
+              <Text style={styles.uploadText}>Tap to upload PDF</Text>
+              <Text style={styles.supportedText}>Bank and mobile-money statements</Text>
             </>
           )}
         </TouchableOpacity>
-
-        <View style={styles.infoSection}>
-          <View style={styles.infoItem}>
-            <MaterialCommunityIcons name="bank" size={24} color="#007AFF" />
-            <Text style={styles.infoText}>Supports major banks</Text>
-          </View>
-          <View style={styles.infoItem}>
-            <MaterialCommunityIcons name="shield-check" size={24} color="#007AFF" />
-            <Text style={styles.infoText}>Secure processing</Text>
-          </View>
-          <View style={styles.infoItem}>
-            <MaterialCommunityIcons name="eye-off" size={24} color="#007AFF" />
-            <Text style={styles.infoText}>Private & confidential</Text>
-          </View>
-        </View>
       </View>
     </SafeAreaView>
   );
@@ -86,59 +76,54 @@ export default function ImportPDFScreen({ navigation }: ImportPDFScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.paper,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.line,
   },
   title: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '700',
+    color: theme.colors.ink,
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: 24,
+    justifyContent: 'center',
   },
   uploadArea: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#e0e0e0',
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    borderColor: theme.colors.cedar,
     borderStyle: 'dashed',
-    marginBottom: 24,
-  },
-  uploadText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginTop: 16,
-  },
-  supportedText: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 8,
-  },
-  infoSection: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
-    gap: 16,
-  },
-  infoItem: {
-    flexDirection: 'row',
+    padding: 48,
     alignItems: 'center',
     gap: 12,
   },
-  infoText: {
-    fontSize: 16,
-    color: '#333',
+  iconBadge: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: theme.colors.sage,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  uploadText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: theme.colors.ink,
+  },
+  supportedText: {
+    fontSize: 14,
+    color: theme.colors.muted,
+    textAlign: 'center',
   },
 });

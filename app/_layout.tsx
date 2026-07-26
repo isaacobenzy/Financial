@@ -4,21 +4,21 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import ToastHost from '@/components/ToastHost';
+import BioSessionGuard from '@/components/BioSessionGuard';
+import NotificationActions from '@/components/NotificationActions';
+import { theme } from '@/constants/theme';
 
-export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary,
-} from 'expo-router';
+export { ErrorBoundary } from 'expo-router';
 
 export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: '(tabs)',
+  initialRouteName: 'onboarding',
 };
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -27,7 +27,6 @@ export default function RootLayout() {
     ...FontAwesome.font,
   });
 
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
   useEffect(() => {
     if (error) throw error;
   }, [error]);
@@ -49,11 +48,31 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-      </Stack>
-    </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.colors.paper }}>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: theme.colors.paper },
+          }}
+        >
+          <Stack.Screen name="onboarding" />
+          <Stack.Screen name="login" />
+          <Stack.Screen name="unlock" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="assistant" />
+          <Stack.Screen name="settings" />
+          <Stack.Screen name="transactions" />
+          <Stack.Screen name="explore" />
+          <Stack.Screen name="import-sms" />
+          <Stack.Screen name="paste-sms" />
+          <Stack.Screen name="import-pdf" />
+          <Stack.Screen name="budget-goals" />
+        </Stack>
+        <BioSessionGuard />
+        <NotificationActions />
+        <ToastHost />
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
