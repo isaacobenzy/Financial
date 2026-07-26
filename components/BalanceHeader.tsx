@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { getLedgerBalance, type LedgerBalance } from '@/lib/ledgerStore';
-import { DEMO_BALANCE } from '@/lib/financeContext';
 import { theme } from '@/constants/theme';
 import { isBalanceHidden, setBalanceHidden } from '@/lib/privacy';
 import { authenticateBiometric, isBiometricUnlockEnabled } from '@/lib/biometrics';
@@ -19,32 +18,23 @@ const MASK = '••••••';
 
 export default function BalanceHeader() {
   const [hidden, setHidden] = useState(false);
-  const [balance, setBalance] = useState<LedgerBalance>({
-    total: DEMO_BALANCE.total,
-    income: DEMO_BALANCE.income,
-    expenses: DEMO_BALANCE.expenses,
-    currency: 'GHS',
-    updatedAt: new Date().toISOString(),
-    smsImports: 0,
-  });
+  const [balance, setBalance] = useState<LedgerBalance | null>(null);
 
   useFocusEffect(
     useCallback(() => {
-      isBalanceHidden().then(setHidden);
-      getLedgerBalance().then((live) => {
-        if (live.smsImports > 0) {
-          setBalance(live);
-          return;
-        }
-        setBalance({
-          total: DEMO_BALANCE.total,
-          income: DEMO_BALANCE.income,
-          expenses: DEMO_BALANCE.expenses,
-          currency: 'GHS',
-          updatedAt: live.updatedAt,
-          smsImports: 0,
-        });
-      });
+      let active = true;
+      (async () => {
+        const [hide, live] = await Promise.all([
+          isBalanceHidden(),
+          getLedgerBalance(),
+        ]);
+        if (!active) return;
+        setHidden(hide);
+        setBalance(live);
+      })();
+      return () => {
+        active = false;
+      };
     }, []),
   );
 
@@ -71,6 +61,19 @@ export default function BalanceHeader() {
     setHidden(true);
     void refreshWidgetSnapshot();
   };
+
+  if (!balance) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.cardShell}>
+          <View style={[styles.balanceCard, styles.balanceCardLoading]}>
+            <Text style={styles.balanceLabel}>Total balance</Text>
+            <Text style={styles.balanceAmount}>—</Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   const show = (value: number) => (hidden ? MASK : formatMoney(value));
 
@@ -134,9 +137,11 @@ const styles = StyleSheet.create({
   balanceCard: {
     backgroundColor: theme.colors.cedar,
     padding: 20,
-    // Soft depth without requiring expo-linear-gradient native link issues
     borderWidth: 1,
     borderColor: 'rgba(216,229,221,0.18)',
+  },
+  balanceCardLoading: {
+    minHeight: 132,
   },
   topRow: {
     flexDirection: 'row',

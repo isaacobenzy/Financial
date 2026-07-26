@@ -19,6 +19,7 @@ export default function HomeLiveWidget() {
 
   useFocusEffect(
     useCallback(() => {
+      // Always rebuild from the live ledger so this matches Total balance.
       void reload();
     }, [reload]),
   );
@@ -50,7 +51,7 @@ export default function HomeLiveWidget() {
   return (
     <View style={styles.wrap}>
       <View style={styles.captionRow}>
-        <Text style={styles.caption}>Live widget</Text>
+        <Text style={styles.caption}>Live · synced</Text>
         <Text style={styles.captionHint}>
           {snap.checkedInToday ? 'Streak checked in today' : 'Open daily to grow streak'}
         </Text>
@@ -59,7 +60,7 @@ export default function HomeLiveWidget() {
         <View style={styles.row}>
           <View style={styles.balanceCol}>
             <View style={styles.labelRow}>
-              <Text style={styles.label}>Balance</Text>
+              <Text style={styles.label}>Total balance</Text>
               <TouchableOpacity
                 onPress={toggleHidden}
                 style={styles.eyeBtn}
@@ -75,7 +76,9 @@ export default function HomeLiveWidget() {
             </View>
             <Text style={styles.balance}>{snap.balanceDisplay}</Text>
             <Text style={styles.hint}>
-              {snap.balanceHidden ? 'Tap the eye to reveal' : 'Tap the eye to hide'}
+              {snap.balanceHidden
+                ? 'Tap the eye to reveal'
+                : 'Matches your ledger total balance'}
             </Text>
           </View>
           <View style={styles.streak}>

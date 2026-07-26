@@ -82,6 +82,13 @@ function RootLayoutNav() {
           >
             <Stack.Screen name="onboarding" />
             <Stack.Screen name="login" />
+            <Stack.Screen
+              name="terms"
+              options={{
+                presentation: 'card',
+                animation: 'slide_from_right',
+              }}
+            />
             <Stack.Screen name="unlock" />
             <Stack.Screen name="(tabs)" />
             <Stack.Screen

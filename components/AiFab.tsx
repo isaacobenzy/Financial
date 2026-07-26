@@ -27,7 +27,8 @@ export default function AiFab() {
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
-  const bottom = tabBarClearance(insets.bottom);
+  // Sit a bit above the floating tab dock so the money chat control feels reachable.
+  const bottom = tabBarClearance(insets.bottom) + 18;
 
   return (
     <View pointerEvents="box-none" style={[styles.wrap, { bottom }]}>

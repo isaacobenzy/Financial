@@ -265,6 +265,11 @@ export default function SettingsScreen() {
             </Text>
           </View>
           <SettingsNavRow
+            icon="file-document-outline"
+            label="Terms & Conditions"
+            onPress={() => router.push('/terms')}
+          />
+          <SettingsNavRow
             icon="logout"
             label="Log out"
             onPress={logout}

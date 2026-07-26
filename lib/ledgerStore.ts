@@ -3,7 +3,8 @@ import type { Transaction } from '@/lib/financeContext';
 
 const IMPORTED_KEY = 'imported_transactions_v1';
 const BALANCE_KEY = 'ledger_balance_v1';
-const BASE_BALANCE = 12500;
+const DEMO_BASE_BALANCE = 12500;
+const REAL_STARTING_BALANCE = 0;
 
 export type LedgerBalance = {
   total: number;
@@ -23,8 +24,16 @@ function normalizeTxId(id: string, index: number): string {
   ) {
     return id;
   }
-  // Legacy numeric SMS ids ("2","3") collided with React keys / demos
   return `sms-legacy-${id}-${index}`;
+}
+
+export function hasRealImportedTransactions(list: Transaction[]): boolean {
+  return list.some(
+    (t) =>
+      !t.id.startsWith('demo-') &&
+      !t.id.startsWith('sms-demo-') &&
+      !t.id.includes('demo'),
+  );
 }
 
 export async function getImportedTransactions(): Promise<Transaction[]> {
@@ -48,15 +57,25 @@ export async function getImportedTransactions(): Promise<Transaction[]> {
 }
 
 function computeFromTransactions(imported: Transaction[]): LedgerBalance {
-  const income = imported
+  const hasReal = hasRealImportedTransactions(imported);
+  const realImported = hasReal
+    ? imported.filter(
+        (t) =>
+          !t.id.startsWith('demo-') &&
+          !t.id.startsWith('sms-demo-') &&
+          !t.id.includes('demo'),
+      )
+    : imported;
+
+  const income = realImported
     .filter((t) => t.type === 'income')
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-  const expenses = imported
+  const expenses = realImported
     .filter((t) => t.type === 'expense')
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
-  // Prefer last SMS-reported available balance if present on newest income/expense meta later.
-  const total = BASE_BALANCE + income - expenses;
+  const base = hasReal ? REAL_STARTING_BALANCE : DEMO_BASE_BALANCE;
+  const total = base + income - expenses;
 
   return {
     total,
@@ -64,7 +83,7 @@ function computeFromTransactions(imported: Transaction[]): LedgerBalance {
     expenses,
     currency: 'GHS',
     updatedAt: new Date().toISOString(),
-    smsImports: imported.length,
+    smsImports: realImported.length,
   };
 }
 

@@ -1,24 +1,67 @@
+import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { seedFromEmail } from '@/lib/navii';
 
-const SESSION_KEY = 'user_session_v1';
+const SECURE_SESSION_KEY = 'user_session_v2';
+const LEGACY_SESSION_KEY = 'user_session_v1';
 
 export type UserSession = {
   email: string;
   name: string;
   phone?: string;
-  /** Navii avatar seed — stable per user */
   naviiSeed: string;
+  signedInAt: string;
 };
 
-export async function getSession(): Promise<UserSession | null> {
+async function readSecureSession(): Promise<UserSession | null> {
   try {
-    const raw = await AsyncStorage.getItem(SESSION_KEY);
+    const raw = await SecureStore.getItemAsync(SECURE_SESSION_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as UserSession;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return parsed as UserSession;
   } catch {
     return null;
   }
+}
+
+async function writeSecureSession(session: UserSession): Promise<void> {
+  await SecureStore.setItemAsync(SECURE_SESSION_KEY, JSON.stringify(session));
+}
+
+async function migrateLegacySession(): Promise<UserSession | null> {
+  try {
+    const raw = await AsyncStorage.getItem(LEGACY_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as {
+      email: string;
+      name?: string;
+      phone?: string;
+    } | null;
+    if (!parsed || !parsed.email) return null;
+    const migrated: UserSession = {
+      email: parsed.email.trim().toLowerCase(),
+      name: parsed.name?.trim() || parsed.email.split('@')[0] || 'User',
+      phone: parsed.phone?.trim() || undefined,
+      naviiSeed: seedFromEmail(parsed.email.trim().toLowerCase()),
+      signedInAt: new Date().toISOString(),
+    };
+    await writeSecureSession(migrated);
+    try {
+      await AsyncStorage.removeItem(LEGACY_SESSION_KEY);
+    } catch {
+      // non-fatal
+    }
+    return migrated;
+  } catch {
+    return null;
+  }
+}
+
+export async function getSession(): Promise<UserSession | null> {
+  const secure = await readSecureSession();
+  if (secure) return secure;
+  return migrateLegacySession();
 }
 
 export async function saveSession(
@@ -32,9 +75,31 @@ export async function saveSession(
     name: name?.trim() || normalized.split('@')[0] || 'User',
     phone: phone?.trim() || undefined,
     naviiSeed: seedFromEmail(normalized),
+    signedInAt: new Date().toISOString(),
   };
-  await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  await writeSecureSession(session);
+  try {
+    await AsyncStorage.removeItem(LEGACY_SESSION_KEY);
+  } catch {
+    // non-fatal
+  }
   return session;
+}
+
+export async function setSessionActive(
+  active: boolean,
+  options?: { session?: UserSession },
+): Promise<void> {
+  if (active) {
+    const current = options?.session || (await getSession());
+    if (!current) return;
+    await writeSecureSession({
+      ...current,
+      signedInAt: new Date().toISOString(),
+    });
+    return;
+  }
+  await clearSession();
 }
 
 export async function updateSession(patch: {
@@ -46,13 +111,26 @@ export async function updateSession(patch: {
   const next: UserSession = {
     ...current,
     name: patch.name?.trim() || current.name,
-    phone: patch.phone !== undefined ? patch.phone.trim() || undefined : current.phone,
+    phone:
+      patch.phone !== undefined
+        ? patch.phone.trim() || undefined
+        : current.phone,
     naviiSeed: seedFromEmail(current.email),
+    signedInAt: current.signedInAt || new Date().toISOString(),
   };
-  await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(next));
+  await writeSecureSession(next);
   return next;
 }
 
 export async function clearSession(): Promise<void> {
-  await AsyncStorage.removeItem(SESSION_KEY);
+  try {
+    await SecureStore.deleteItemAsync(SECURE_SESSION_KEY);
+  } catch {
+    // non-fatal
+  }
+  try {
+    await AsyncStorage.removeItem(LEGACY_SESSION_KEY);
+  } catch {
+    // non-fatal
+  }
 }

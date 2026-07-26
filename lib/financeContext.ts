@@ -12,9 +12,9 @@ export type Transaction = {
 };
 
 export const DEMO_BALANCE = {
-  total: 12500,
-  income: 15000,
-  expenses: 2500,
+  total: 0,
+  income: 0,
+  expenses: 0,
   currency: 'GHS' as const,
 };
 
@@ -69,11 +69,34 @@ export const DEMO_BUDGETS = SEED_GOALS.map((g) => ({
 
 export async function getAllTransactions(): Promise<Transaction[]> {
   const imported = await getImportedTransactions();
-  // Guarantee unique React keys even if old AsyncStorage ids collide with demos
-  const taggedImported = imported.map((t, i) => ({
+  const taggedImported: Transaction[] = imported.map((t, i) => ({
     ...t,
-    id: t.id.startsWith('sms-') || t.id.startsWith('inbox-') ? t.id : `sms-${t.id}-${i}`,
+    id:
+      t.id.startsWith('sms-') ||
+      t.id.startsWith('inbox-') ||
+      t.id.startsWith('pdf-') ||
+      t.id.startsWith('demo-')
+        ? t.id
+        : `sms-${t.id}-${i}`,
   }));
+
+  const hasRealData = taggedImported.some(
+    (t) =>
+      !t.id.startsWith('demo-') &&
+      !t.id.startsWith('sms-demo-') &&
+      !t.id.includes('demo'),
+  );
+
+  if (hasRealData) {
+    const realOnly = taggedImported.filter(
+      (t) =>
+        !t.id.startsWith('demo-') &&
+        !t.id.startsWith('sms-demo-') &&
+        !t.id.includes('demo'),
+    );
+    return realOnly;
+  }
+
   return [...taggedImported, ...DEMO_TRANSACTIONS];
 }
 
@@ -82,11 +105,20 @@ export async function buildFinanceSystemPrompt(): Promise<string> {
   const imported = await getImportedTransactions();
   const balance = await getLedgerBalance();
 
+  const hasReal = transactions.some(
+    (t) =>
+      !t.id.startsWith('demo-') &&
+      !t.id.startsWith('sms-demo-') &&
+      !t.id.includes('demo'),
+  );
+
   const txLines = transactions
-    .slice(0, 40)
+    .slice(0, 50)
     .map(
       (t) =>
-        `- ${t.date} | ${t.merchant} | ${t.category} | ${t.type} | ${t.amount} ${balance.currency}`,
+        `- ${t.date} | ${t.merchant} | ${t.category} | ${t.type} | ${t.amount} ${balance.currency}${
+          t.id.startsWith('demo-') || t.id.includes('demo') ? ' (sample)' : ''
+        }`,
     )
     .join('\n');
 
@@ -94,9 +126,13 @@ export async function buildFinanceSystemPrompt(): Promise<string> {
   const budgetLines = goals
     .map(
       (g) =>
-        `- ${g.name} (${g.period}, ${g.kind}): current ${g.current} / target ${g.target} ${balance.currency}`,
+        `- ${g.name} (${g.period}, ${g.kind}): current ${g.current} / target ${g.target} ${balance.currency} — status ${g.status}`,
     )
     .join('\n');
+
+  const dataStatus = hasReal
+    ? 'Data status: Using REAL imported transactions from this device. Sample rows excluded.'
+    : 'DATA STATUS WARNING: No real SMS or paste imports yet. ALL transactions below are SAMPLE data. Tell the user to Import SMS or Paste SMS to get real answers about their actual money.';
 
   return [
     'You are Financial Copilot, a personal finance assistant for THIS user only.',
@@ -104,18 +140,20 @@ export async function buildFinanceSystemPrompt(): Promise<string> {
     'The user can type free-form questions — still stay in scope.',
     'Off-topic (politics, coding, celebrities, homework, general chat): reply with exactly one short refusal and ask a finance question instead.',
     'Never invent merchants or amounts. If data is missing, say what is missing and suggest Import SMS or Paste SMS.',
+    'When using sample-only data, always mention it in the first sentence and explicitly recommend Import SMS / Paste SMS.',
     'Prefer SMS-imported totals when present. Keep answers under 120 words. Use GHS.',
     '',
+    dataStatus,
     `Total balance: ${balance.total.toFixed(2)} ${balance.currency}`,
-    `SMS-imported income: ${balance.income.toFixed(2)} ${balance.currency}`,
-    `SMS-imported expenses: ${balance.expenses.toFixed(2)} ${balance.currency}`,
-    `Imported SMS transactions: ${imported.length}`,
+    `Real income: ${balance.income.toFixed(2)} ${balance.currency}`,
+    `Real expenses: ${balance.expenses.toFixed(2)} ${balance.currency}`,
+    `Imported transactions (real): ${hasReal ? balance.smsImports : 0}`,
     `Ledger updated: ${balance.updatedAt}`,
     '',
-    'Recent transactions (imported first):',
-    txLines || '- none',
+    'Recent transactions:',
+    txLines || '- none imported yet',
     '',
-    'Financial goals (live, user-editable):',
-    budgetLines || '- none set',
+    'Financial goals (user-editable):',
+    budgetLines || '- none set yet',
   ].join('\n');
 }

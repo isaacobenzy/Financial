@@ -25,7 +25,8 @@ export type SmsImportMode =
   | 'scan_error';
 
 const PREFER_REAL_KEY = 'sms_prefer_real_v1';
-const SCAN_TIMEOUT_MS = 10_000;
+const SCAN_TIMEOUT_MS = 20_000;
+const SCAN_RETRIES = 2;
 
 export const DEMO_SMS: SmsMessage[] = [
   {
@@ -58,6 +59,74 @@ export const DEMO_SMS: SmsMessage[] = [
     body: 'Win a free phone today! Dial *123#',
     date: String(Date.now() - 100000),
   },
+];
+
+export const GHANA_SENDER_ALLOWLIST = [
+  'MTN',
+  'MOMO',
+  'MoMo',
+  'VODAFONE',
+  'Vodafone',
+  'Vcash',
+  'TELECEL',
+  'Telecel',
+  'AIRTEL',
+  'Airtel',
+  'TIGO',
+  'Tigo',
+  'GCB',
+  'ECOBANK',
+  'Ecobank',
+  'STANBIC',
+  'Stanbic',
+  'ABSA',
+  'Absa',
+  'CAL',
+  'CalBank',
+  'FIDELITY',
+  'Fidelity',
+  'Access Bank',
+  'ACCESS',
+  'UBA',
+  'Zenith',
+  'ZENITH',
+  'GTBank',
+  'GT BANK',
+  'SCB',
+  'Standard Chartered',
+  'FNB',
+  'First Nat',
+  'HFC',
+  'Republic',
+  'SIC',
+  'Bank',
+  'BANK',
+  'Momo',
+  'MobileMoney',
+  'Mobile Money',
+  'MOBILE MONEY',
+  'Cash',
+  'CASH',
+  'ALERT',
+  'Alert',
+  'NOTICE',
+  'Notice',
+  'Payment',
+  'PAYMENT',
+  'Transfer',
+  'TRANSFER',
+  'Credit',
+  'CREDIT',
+  'Debit',
+  'DEBIT',
+  'Transaction',
+  'TXN',
+  'Balance',
+  'BALANCE',
+  'GHS',
+  'Ghc',
+  'GH¢',
+  '₵',
 ];
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -124,6 +193,7 @@ function nativeMissingResult(permissionGranted: boolean) {
  */
 export async function fetchInboxSms(options?: {
   allowDemoFallback?: boolean;
+  scanDays?: number;
 }): Promise<{
   messages: SmsMessage[];
   usingDemo: boolean;
@@ -147,7 +217,8 @@ export async function fetchInboxSms(options?: {
       usingDemo: false,
       mode: 'unavailable',
       permissionGranted: true,
-      reason: 'iOS cannot read the SMS inbox. Use Paste SMS instead.',
+      reason:
+        'iOS cannot read the SMS inbox. Use Paste SMS instead — copy MoMo or bank alerts from the Messages app and paste them here.',
     };
   }
 
@@ -158,7 +229,8 @@ export async function fetchInboxSms(options?: {
       usingDemo: false,
       mode: 'permission_denied',
       permissionGranted: false,
-      reason: 'SMS permission was denied.',
+      reason:
+        'SMS permission was denied. Open system settings, grant READ_SMS, then come back and try again.',
     };
   }
 
@@ -176,54 +248,89 @@ export async function fetchInboxSms(options?: {
     return expoGoResult(true);
   }
 
+  let smsReader: Awaited<ReturnType<typeof getNativeSmsReader>> = null;
   try {
-    const smsReader = await getNativeSmsReader();
+    smsReader = await getNativeSmsReader();
     if (!smsReader) {
       return nativeMissingResult(true);
     }
+  } catch (err) {
+    return nativeMissingResult(true);
+  }
 
+  const scanDays = options?.scanDays ?? 90;
+
+  const attemptScan = async (attempt: number): Promise<ReturnType<typeof fetchInboxSms>> => {
     const scan = (async () => {
-      const status = await smsReader.ensurePermissionsAsync();
-      if (status !== 'granted') {
+      let status = 'granted';
+      try {
+        status = await smsReader!.ensurePermissionsAsync();
+      } catch {
+        // If native perm check fails, assume granted since we already passed PermissionsAndroid above
+        status = 'granted';
+      }
+
+      if (status && status !== 'granted' && status !== 'undetermined') {
+        // Treat anything other than explicitly denied as still trying (some bridges return empty strings)
+        const deniedTitles = ['denied', 'blocked', 'rejected', 'restricted'];
+        const lowered = String(status).toLowerCase();
+        if (deniedTitles.some((t) => lowered.includes(t))) {
+          return {
+            messages: [] as SmsMessage[],
+            usingDemo: false,
+            mode: 'permission_denied' as const,
+            permissionGranted: false,
+            reason:
+              'SMS permission is denied inside the native SMS bridge. Open system settings and grant SMS access, then use Paste SMS for immediate results.',
+          };
+        }
+      }
+
+      const since = Date.now() - scanDays * 24 * 60 * 60 * 1000;
+      let rows: Awaited<ReturnType<NonNullable<typeof smsReader>['getRecentMessages']>> = [];
+      try {
+        rows = await smsReader!.getRecentMessages({
+          limit: 400,
+          sinceTimestamp: since,
+          onlyTransactions: false,
+          minConfidence: 0.05,
+          senderAllowlist: GHANA_SENDER_ALLOWLIST,
+        });
+      } catch (readErr) {
+        if (attempt < SCAN_RETRIES) {
+          throw readErr;
+        }
         return {
           messages: [] as SmsMessage[],
           usingDemo: false,
-          mode: 'permission_denied' as const,
-          permissionGranted: false,
-          reason: 'SMS permission was denied by the reader module.',
+          mode: 'scan_error' as const,
+          permissionGranted: true,
+          reason: `Could not read the inbox (${readErr instanceof Error ? readErr.message : 'native error'}). Try Paste SMS instead.`,
         };
       }
 
-      const since = Date.now() - 60 * 24 * 60 * 60 * 1000;
-      // Broad native fetch — app-side isFinancialSms is the source of truth for Ghana MoMo/banks
-      const rows = await smsReader.getRecentMessages({
-        limit: 200,
-        sinceTimestamp: since,
-        onlyTransactions: false,
-        minConfidence: 0.2,
-        senderAllowlist: [
-          'MTN',
-          'MoMo',
-          'Vodafone',
-          'Telecel',
-          'Airtel',
-          'GCB',
-          'ECOBANK',
-          'STANBIC',
-          'ABSA',
-          'CAL',
-          'FIDELITY',
-        ],
-      });
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return {
+          messages: [] as SmsMessage[],
+          usingDemo: false,
+          mode: 'empty_inbox' as const,
+          permissionGranted: true,
+          reason:
+            'Permission granted, but no SMS were returned by the system. If you know there are MoMa/bank texts, try Paste SMS as a reliable alternative.',
+        };
+      }
 
-      const messages: SmsMessage[] = rows.map((row, index) => ({
-        id: `inbox-${row.raw?.id ?? row.raw?._id ?? index}-${row.raw?.date ?? index}`,
-        address: row.raw?.address || row.transaction?.sender || 'Unknown',
-        body: row.raw?.body || '',
-        date: String(row.raw?.date ?? row.raw?.timestamp ?? Date.now()),
-      }));
+      const messages: SmsMessage[] = rows
+        .map((row, index) => ({
+          id: `inbox-${row.raw?.id ?? row.raw?._id ?? index}-${row.raw?.date ?? index}-${attempt}`,
+          address: row.raw?.address || row.transaction?.sender || 'Unknown',
+          body: row.raw?.body || '',
+          date: String(row.raw?.date ?? row.raw?.timestamp ?? Date.now()),
+        }))
+        .filter((m) => m.body && m.body.trim().length > 3);
 
       const financial = filterFinancial(messages);
+
       return {
         messages: financial,
         usingDemo: false,
@@ -231,38 +338,99 @@ export async function fetchInboxSms(options?: {
         permissionGranted: true,
         reason: financial.length
           ? undefined
-          : 'Permission granted, but no financial MoMo/bank SMS were found in the last 60 days.',
+          : `Permission granted — scanned ${messages.length} SMS from the last ${scanDays} days but none matched Ghana MoMo or bank patterns. Try Paste SMS with a known MoMo alert.`,
       };
     })();
 
-    return await withTimeout(scan, SCAN_TIMEOUT_MS, 'SMS inbox scan');
-  } catch (err) {
-    if (allowDemoFallback) {
-      return {
-        messages: filterFinancial(DEMO_SMS),
-        usingDemo: true,
-        mode: 'demo',
-        permissionGranted: true,
-      };
-    }
-    const message = err instanceof Error ? err.message : String(err);
-    if (message.includes('timed out')) {
+    try {
+      return (await withTimeout(scan, SCAN_TIMEOUT_MS, `SMS inbox scan #${attempt + 1}`)) as Awaited<
+        ReturnType<typeof fetchInboxSms>
+      >;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (attempt < SCAN_RETRIES) {
+        // brief pause before retry
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        return attemptScan(attempt + 1);
+      }
+      if (message.includes('timed out')) {
+        return {
+          messages: [],
+          usingDemo: false,
+          mode: 'timeout',
+          permissionGranted: true,
+          reason:
+            'SMS inbox scan timed out after several tries. Use Paste SMS instead — it works reliably on every device.',
+        };
+      }
       return {
         messages: [],
         usingDemo: false,
-        mode: 'timeout',
+        mode: 'scan_error',
         permissionGranted: true,
-        reason: 'SMS inbox scan timed out. Try again or use Paste SMS.',
+        reason: `Could not read the SMS inbox (${message}). Try again or use Paste SMS.`,
       };
     }
+  };
+
+  const firstResult = await attemptScan(0);
+
+  // If native scan ran but yielded 0 rows, try once without the allowlist filter
+  // because some Android builds use numeric shortcodes that don't match our keywords.
+  if (
+    firstResult.mode === 'empty_inbox' &&
+    firstResult.messages.length === 0 &&
+    firstResult.permissionGranted
+  ) {
+    try {
+      const since = Date.now() - scanDays * 24 * 60 * 60 * 1000;
+      const broadRows = await smsReader!.getRecentMessages({
+        limit: 600,
+        sinceTimestamp: since,
+        onlyTransactions: false,
+        minConfidence: 0,
+        senderAllowlist: [],
+      });
+      if (Array.isArray(broadRows) && broadRows.length > 0) {
+        const broadMessages: SmsMessage[] = broadRows
+          .slice(0, 500)
+          .map((row, index) => ({
+            id: `inbox-broad-${row.raw?.id ?? row.raw?._id ?? index}-${row.raw?.date ?? index}`,
+            address: row.raw?.address || row.transaction?.sender || 'Unknown',
+            body: row.raw?.body || '',
+            date: String(row.raw?.date ?? row.raw?.timestamp ?? Date.now()),
+          }))
+          .filter((m) => m.body && m.body.trim().length > 3);
+        const financial = filterFinancial(broadMessages);
+        if (financial.length) {
+          return {
+            messages: financial,
+            usingDemo: false,
+            mode: 'native',
+            permissionGranted: true,
+          };
+        }
+      }
+    } catch {
+      // ignore — keep firstResult
+    }
+  }
+
+  if (
+    !firstResult.messages.length &&
+    allowDemoFallback &&
+    firstResult.permissionGranted &&
+    firstResult.mode !== 'permission_denied'
+  ) {
     return {
-      messages: [],
-      usingDemo: false,
-      mode: 'scan_error',
+      messages: filterFinancial(DEMO_SMS),
+      usingDemo: true,
+      mode: 'demo',
       permissionGranted: true,
-      reason: 'Could not read the SMS inbox. Try again or use Paste SMS.',
     };
   }
+
+  return firstResult;
 }
 
 export async function openSmsSettingsIfBlocked(): Promise<void> {

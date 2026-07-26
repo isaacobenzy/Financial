@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -67,7 +67,7 @@ function friendlyAiFailure(detail: string): { toast: string; bubble: string } {
 export default function AssistantScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const params = useLocalSearchParams<{ suggest?: string }>();
   const listRef = useRef<FlatList<UiMessage>>(null);
   const inputRef = useRef<TextInput>(null);
@@ -76,6 +76,7 @@ export default function AssistantScreen() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [messages, setMessages] = useState<UiMessage[]>([
     {
       id: 'welcome',
@@ -98,15 +99,37 @@ export default function AssistantScreen() {
     return DEFAULT_PROMPTS;
   }, [params.suggest]);
 
-  /** Cap composer growth on short phones / when keyboard owns the bottom. */
+  const scrollToBottom = useCallback(
+    (animated = true, delay = 0) => {
+      const ref = listRef.current;
+      if (!ref) return;
+      if (delay <= 0) {
+        try {
+          ref.scrollToEnd({ animated });
+        } catch {
+          /* noop */
+        }
+        return;
+      }
+      const id = setTimeout(() => {
+        try {
+          ref.scrollToEnd({ animated });
+        } catch {
+          /* noop */
+        }
+        clearTimeout(id);
+      }, delay);
+    },
+    [],
+  );
+
   const inputMaxHeight = useMemo(() => {
-    const ratio = keyboardVisible ? 0.12 : 0.18;
-    const softCap = keyboardVisible ? 96 : 140;
+    const ratio = keyboardVisible ? 0.14 : 0.2;
+    const softCap = keyboardVisible ? 110 : 150;
     return Math.min(softCap, Math.max(56, Math.round(windowHeight * ratio)));
   }, [keyboardVisible, windowHeight]);
 
   useEffect(() => {
-    // Ease the composer in above the floating tab / system nav when chat opens.
     Animated.spring(composerEnter, {
       toValue: 0,
       speed: 18,
@@ -120,36 +143,62 @@ export default function AssistantScreen() {
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const frameEvent = Platform.OS === 'ios' ? 'keyboardWillChangeFrame' : 'keyboardDidChangeFrame';
+
+    let cancelled = false;
+    let lastShowKHeight = -1;
+    let lastFrameKHeight = -1;
 
     const onShow = (e: { duration?: number; endCoordinates: { height: number } }) => {
+      if (cancelled) return;
+      const kHeight = e.endCoordinates?.height ?? 0;
+      if (kHeight === lastShowKHeight) return;
+      lastShowKHeight = kHeight;
+      const duration = typeof e.duration === 'number' && e.duration > 0 ? e.duration : 250;
+      const lift = Platform.OS === 'ios' ? 6: Math.min(20, Math.max(10, kHeight * 0.045));
       setKeyboardVisible(true);
-      // Ease composer above the system nav / home indicator as the keyboard rises.
-      // Android uses softwareKeyboardLayoutMode=resize, so we only animate a light lift.
-      const lift = Platform.OS === 'ios' ? 0 : Math.min(8, Math.max(0, e.endCoordinates.height * 0.02));
+      setKeyboardHeight(kHeight);
       Animated.timing(composerLift, {
         toValue: lift,
-        duration: typeof e.duration === 'number' && e.duration > 0 ? e.duration : 220,
+        duration,
         useNativeDriver: true,
       }).start();
-      requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+      scrollToBottom(true, duration + 60);
     };
 
     const onHide = (e: { duration?: number }) => {
+      if (cancelled) return;
+      lastShowKHeight = -1;
+      lastFrameKHeight = -1;
+      const duration = typeof e.duration === 'number' && e.duration > 0 ? e.duration : 220;
       setKeyboardVisible(false);
+      setKeyboardHeight(0);
       Animated.timing(composerLift, {
         toValue: 0,
-        duration: typeof e.duration === 'number' && e.duration > 0 ? e.duration : 180,
+        duration,
         useNativeDriver: true,
       }).start();
+    };
+
+    const onFrame = (e: { duration?: number; endCoordinates: { height: number } }) => {
+      if (cancelled) return;
+      const kHeight = e.endCoordinates?.height ?? 0;
+      if (kHeight > 0 && kHeight !== lastFrameKHeight) {
+        lastFrameKHeight = kHeight;
+        setKeyboardHeight(kHeight);
+      }
     };
 
     const showSub = Keyboard.addListener(showEvent, onShow);
     const hideSub = Keyboard.addListener(hideEvent, onHide);
+    const frameSub = Keyboard.addListener(frameEvent, onFrame);
     return () => {
+      cancelled = true;
       showSub.remove();
       hideSub.remove();
+      frameSub.remove();
     };
-  }, [composerLift]);
+  }, [composerLift, scrollToBottom]);
 
   const sendPrompt = async (text: string) => {
     const trimmed = text.trim();
@@ -197,132 +246,173 @@ export default function AssistantScreen() {
       ]);
     } finally {
       setLoading(false);
-      requestAnimationFrame(() => {
-        listRef.current?.scrollToEnd({ animated: true });
+      scrollToBottom(true, 40);
+      setTimeout(() => {
         inputRef.current?.focus();
-      });
+      }, 60);
     }
   };
 
   const composerPadBottom = keyboardVisible
     ? Platform.OS === 'ios'
-      ? 10
-      : 12
-    : Math.max(insets.bottom, 12);
+      ? Math.max(16, insets.bottom + 4)
+      : Math.max(18, insets.bottom + 8)
+    : Math.max(insets.bottom + 22, 28);
+
+  const iosKbOffset = Math.max(insets.top + 8, 12);
+
+  const showQuickPrompts = !keyboardVisible || windowHeight > 680;
+
+  const onContentSizeChange = useCallback(() => {
+    scrollToBottom(true, 10);
+  }, [scrollToBottom]);
+
+  const onListLayout = useCallback(() => {
+    scrollToBottom(false, 0);
+  }, [scrollToBottom]);
+
+  const onInputFocus = useCallback(() => {
+    scrollToBottom(true, 120);
+  }, [scrollToBottom]);
+
+  const onInputLayout = useCallback(() => {
+    scrollToBottom(false, 20);
+  }, [scrollToBottom]);
+
+  const goBack = useCallback(() => {
+    Keyboard.dismiss();
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)');
+  }, [router]);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? Math.max(insets.top, 8) : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? iosKbOffset : 0}
       >
-        <View style={styles.header}>
-          <View style={styles.headerTop}>
-            <TouchableOpacity
-              onPress={() => {
-                Keyboard.dismiss();
-                if (router.canGoBack()) router.back();
-                else router.replace('/(tabs)');
-              }}
-              style={styles.backBtn}
-              accessibilityLabel="Close assistant"
-            >
-              <MaterialCommunityIcons name="arrow-left" size={22} color={theme.colors.ink} />
-            </TouchableOpacity>
-            <View style={styles.headerCopy}>
-              <Text style={styles.eyebrow}>Copilot</Text>
-              <Text style={styles.title} numberOfLines={1}>
-                Ask your ledger
-              </Text>
-            </View>
-          </View>
-          {!configured ? (
-            <View style={styles.configHint}>
-              <MaterialCommunityIcons
-                name="key-alert-outline"
-                size={16}
-                color={theme.colors.coral}
-              />
-              <Text style={styles.configHintText}>
-                AI isn’t configured on this build. Add the OpenRouter key, then rebuild.
-              </Text>
-            </View>
-          ) : null}
-        </View>
-
-        {!keyboardVisible || windowHeight > 720 ? (
-          <View style={styles.quickPrompts}>
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyboardShouldPersistTaps="always"
-              data={quickPrompts}
-              keyExtractor={(item) => item}
-              contentContainerStyle={styles.promptsContainer}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.promptButton}
-                  onPress={() => sendPrompt(item)}
-                  disabled={loading}
-                >
-                  <Text style={styles.promptText}>{item}</Text>
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-        ) : null}
-
-        <FlatList
-          ref={listRef}
-          data={messages}
-          keyExtractor={(item) => item.id}
-          style={styles.flex}
-          contentContainerStyle={styles.chatList}
-          keyboardShouldPersistTaps="always"
-          keyboardDismissMode="interactive"
-          onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
-          renderItem={({ item }) => {
-            const isError = item.tone === 'error';
-            return (
-              <View
-                style={[
-                  styles.bubble,
-                  item.role === 'user' ? styles.userBubble : styles.assistantBubble,
-                  isError && styles.errorBubble,
-                ]}
+        <View style={styles.flex}>
+          <View style={styles.header}>
+            <View style={styles.headerTop}>
+              <TouchableOpacity
+                onPress={goBack}
+                style={styles.backBtn}
+                accessibilityLabel="Close assistant"
               >
-                {isError ? (
-                  <View style={styles.errorHeader}>
-                    <MaterialCommunityIcons
-                      name="alert-circle-outline"
-                      size={16}
-                      color={theme.colors.coral}
-                    />
-                    <Text style={styles.errorLabel}>Couldn’t complete</Text>
-                  </View>
-                ) : null}
-                <Text
-                  style={[
-                    styles.messageText,
-                    item.role === 'user' ? styles.userText : styles.assistantText,
-                    isError && styles.errorText,
-                  ]}
-                >
-                  {item.content}
+                <MaterialCommunityIcons name="arrow-left" size={22} color={theme.colors.ink} />
+              </TouchableOpacity>
+              <View style={styles.headerCopy}>
+                <Text style={styles.eyebrow}>Copilot</Text>
+                <Text style={styles.title} numberOfLines={1}>
+                  Ask your ledger
                 </Text>
               </View>
-            );
-          }}
-          ListFooterComponent={
-            loading ? (
-              <View style={styles.typing}>
-                <ActivityIndicator color={theme.colors.cedar} />
-                <Text style={styles.typingText}>Thinking…</Text>
+            </View>
+            {!configured ? (
+              <View style={styles.configHint}>
+                <MaterialCommunityIcons
+                  name="key-alert-outline"
+                  size={16}
+                  color={theme.colors.coral}
+                />
+                <Text style={styles.configHintText}>
+                  AI isn’t configured on this build. Add the OpenRouter key, then rebuild.
+                </Text>
               </View>
-            ) : null
-          }
-        />
+            ) : null}
+          </View>
+
+          {showQuickPrompts ? (
+            <View style={styles.quickPrompts}>
+              <FlatList
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="always"
+                data={quickPrompts}
+                keyExtractor={(item) => item}
+                contentContainerStyle={styles.promptsContainer}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.promptButton}
+                    onPress={() => sendPrompt(item)}
+                    disabled={loading}
+                  >
+                    <Text style={styles.promptText}>{item}</Text>
+                  </TouchableOpacity>
+                )}
+              />
+            </View>
+          ) : null}
+
+          <View
+            style={[
+              styles.chatListWrapper,
+              {
+                minHeight: Math.max(
+                  180,
+                  windowHeight -
+                    (showQuickPrompts ? 180 : 130) -
+                    iosKbOffset -
+                    (keyboardVisible ? keyboardHeight : Math.max(insets.bottom, 40)) -
+                    80,
+                ),
+              },
+            ]}
+          >
+            <FlatList
+              ref={listRef}
+              data={messages}
+              keyExtractor={(item) => item.id}
+              style={styles.flex}
+              contentContainerStyle={styles.chatList}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+              onContentSizeChange={onContentSizeChange}
+              onLayout={onListLayout}
+              renderItem={({ item }) => {
+                const isError = item.tone === 'error';
+                return (
+                  <View
+                    style={[
+                      styles.bubble,
+                      item.role === 'user' ? styles.userBubble : styles.assistantBubble,
+                      isError && styles.errorBubble,
+                    ]}
+                  >
+                    {isError ? (
+                      <View style={styles.errorHeader}>
+                        <MaterialCommunityIcons
+                          name="alert-circle-outline"
+                          size={16}
+                          color={theme.colors.coral}
+                        />
+                        <Text style={styles.errorLabel}>Couldn’t complete</Text>
+                      </View>
+                    ) : null}
+                    <Text
+                      style={[
+                        styles.messageText,
+                        item.role === 'user' ? styles.userText : styles.assistantText,
+                        isError && styles.errorText,
+                      ]}
+                    >
+                      {item.content}
+                    </Text>
+                  </View>
+                );
+              }}
+              ListFooterComponent={
+                loading ? (
+                  <View style={styles.typing}>
+                    <ActivityIndicator color={theme.colors.cedar} />
+                    <Text style={styles.typingText}>Thinking…</Text>
+                  </View>
+                ) : null
+              }
+            />
+          </View>
+        </View>
 
         <Animated.View
           style={[
@@ -351,9 +441,8 @@ export default function AssistantScreen() {
             autoCorrect
             autoCapitalize="sentences"
             textAlignVertical="top"
-            onFocus={() => {
-              requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
-            }}
+            onFocus={onInputFocus}
+            onLayout={onInputLayout}
           />
           <Pressable
             style={({ pressed }) => [
@@ -380,6 +469,10 @@ const styles = StyleSheet.create({
   },
   flex: {
     flex: 1,
+  },
+  chatListWrapper: {
+    flex: 1,
+    minHeight: 200,
   },
   header: {
     paddingHorizontal: 20,

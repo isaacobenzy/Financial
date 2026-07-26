@@ -5,8 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
-  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -14,12 +12,15 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { theme } from '@/constants/theme';
 import { useNotificationSettingsStore } from '@/lib/notificationSettingsStore';
 import {
-  getCachedExpoPushToken,
   registerForPushNotifications,
-  sendActivityPush,
 } from '@/lib/pushNotifications';
 import { notificationService } from '@/lib/notificationStore';
-import { isExpoGo, isWeb, supportsSystemNotifications } from '@/lib/runtime';
+import {
+  isEnterpriseMode,
+  isWeb,
+  showExpoBanners,
+  supportsSystemNotifications,
+} from '@/lib/runtime';
 import { haptics } from '@/lib/haptics';
 import {
   getLiveSectionPrefs,
@@ -68,7 +69,6 @@ const LIVE_ROWS: Array<{
 export default function NotificationsSettingsScreen() {
   const router = useRouter();
   const store = useNotificationSettingsStore();
-  const [token, setToken] = useState<string | null>(getCachedExpoPushToken());
   const [busy, setBusy] = useState(false);
   const [livePrefs, setLivePrefs] = useState<LiveSectionPrefs>({
     overview: false,
@@ -76,14 +76,14 @@ export default function NotificationsSettingsScreen() {
     goals: false,
     streak: false,
   });
-  const expoGo = isExpoGo();
   const onWeb = isWeb();
+  const enterprise = isEnterpriseMode();
+  const showBanners = showExpoBanners();
   const pushSupported = supportsSystemNotifications();
 
   useFocusEffect(
     useCallback(() => {
       void store.hydrate();
-      setToken(getCachedExpoPushToken());
       void getLiveSectionPrefs().then(setLivePrefs);
     }, [store]),
   );
@@ -94,14 +94,8 @@ export default function NotificationsSettingsScreen() {
       setBusy(true);
       try {
         const next = await registerForPushNotifications();
-        setToken(next);
         if (next) notificationService.success('Push notifications enabled');
-        else if (expoGo) {
-          notificationService.warning(
-            'Expo Go cannot register Android push. Use a development build.',
-            'Expo Go limit',
-          );
-        } else {
+        else {
           notificationService.warning('Enable notifications in device settings');
         }
       } finally {
@@ -121,55 +115,39 @@ export default function NotificationsSettingsScreen() {
     notificationService.info(value ? `${section} widget on` : `${section} widget off`);
   };
 
-  const sendTest = async () => {
-    setBusy(true);
-    try {
-      if (!token) {
-        const next = await registerForPushNotifications();
-        setToken(next);
-      }
-      await sendActivityPush({
-        title: 'Financial Copilot',
-        body: 'Test alert — feel (haptic), see (toast), hear (OS sound).',
-        category: 'general',
-        data: { href: '/notifications-settings' },
-      });
-      notificationService.info('Test sent');
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.back}>
           <MaterialCommunityIcons name="arrow-left" size={24} color={theme.colors.ink} />
         </TouchableOpacity>
-        <Text style={styles.title}>Feedback & alerts</Text>
+        <Text style={styles.title}>
+          {enterprise ? 'Enterprise alerts' : 'Feedback & alerts'}
+        </Text>
         <View style={styles.back} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.subtitle}>
-          Feel haptics, see in-app toasts, and hear OS push. Toggle what stays live on your lock
-          screen.
+          {enterprise
+            ? 'Manage OS push notifications, haptics, and live widgets for your organization-issued device.'
+            : 'Feel haptics, see in-app toasts, and hear OS push. Toggle what stays live on your lock screen.'}
         </Text>
 
         {onWeb ? (
           <View style={styles.banner}>
             <Text style={styles.bannerText}>
-              Web preview shows in-app toasts only. OS push and lock-screen widgets need the Android
-              preview APK — share this link for a no-install try.
+              Web preview shows in-app toasts only. Install the native app for OS push and
+              lock-screen widgets.
             </Text>
           </View>
         ) : null}
 
-        {expoGo ? (
+        {showBanners ? (
           <View style={styles.banner}>
             <Text style={styles.bannerText}>
-              Expo Go on Android cannot use remote push (SDK 53+). Toasts and haptics still work —
-              use a preview APK for lock-screen alerts.
+              Limited notification support in Expo Go. Build a native preview APK for full
+              lock-screen alerts.
             </Text>
           </View>
         ) : null}
@@ -258,28 +236,6 @@ export default function NotificationsSettingsScreen() {
             <Text style={styles.secondaryText}>Refresh live widgets</Text>
           </TouchableOpacity>
         </View>
-
-        <SettingsSection title="Test on this device">
-          <View style={styles.tokenBox}>
-            <Text style={styles.tokenLabel}>Expo push token</Text>
-            <Text style={styles.token} selectable>
-              {token || 'Not registered yet'}
-            </Text>
-            <TouchableOpacity style={styles.primary} onPress={sendTest} disabled={busy}>
-              {busy ? (
-                <ActivityIndicator color={theme.colors.white} />
-              ) : (
-                <Text style={styles.primaryText}>Send test notification</Text>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.link}
-              onPress={() => Linking.openURL('https://expo.dev/notifications')}
-            >
-              <Text style={styles.linkText}>Open Expo push tool</Text>
-            </TouchableOpacity>
-          </View>
-        </SettingsSection>
       </ScrollView>
     </SafeAreaView>
   );
@@ -322,27 +278,4 @@ const styles = StyleSheet.create({
   actions: { marginHorizontal: 16, marginTop: 10 },
   secondary: { paddingVertical: 12, alignItems: 'center' },
   secondaryText: { color: theme.colors.brass, fontWeight: '700' },
-  tokenBox: { padding: 14 },
-  tokenLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: theme.colors.muted,
-    marginBottom: 6,
-  },
-  token: {
-    fontSize: 11,
-    color: theme.colors.ink,
-    fontFamily: 'SpaceMono',
-    marginBottom: 14,
-    lineHeight: 16,
-  },
-  primary: {
-    backgroundColor: theme.colors.cedar,
-    borderRadius: theme.radius.md,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  primaryText: { color: theme.colors.white, fontWeight: '700' },
-  link: { alignItems: 'center', paddingVertical: 12 },
-  linkText: { color: theme.colors.brass, fontWeight: '700' },
 });
