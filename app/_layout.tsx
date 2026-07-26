@@ -84,7 +84,14 @@ function RootLayoutNav() {
             <Stack.Screen name="login" />
             <Stack.Screen name="unlock" />
             <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="assistant" />
+            <Stack.Screen
+              name="assistant"
+              options={{
+                presentation: 'card',
+                animation: 'slide_from_bottom',
+                gestureEnabled: true,
+              }}
+            />
             <Stack.Screen name="settings" />
             <Stack.Screen name="notifications-settings" />
             <Stack.Screen name="transactions" />

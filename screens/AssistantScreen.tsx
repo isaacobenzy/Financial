@@ -7,15 +7,18 @@ import {
   FlatList,
   TouchableOpacity,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   ActivityIndicator,
   Pressable,
+  Animated,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { theme } from '@/constants/theme';
-import { askOpenRouter, type ChatMessage } from '@/lib/openrouter';
+import { askOpenRouter, isOpenRouterConfigured, type ChatMessage } from '@/lib/openrouter';
 import { haptics } from '@/lib/haptics';
 import { recordActivity } from '@/lib/achievements';
 import { notificationService } from '@/lib/notificationStore';
@@ -36,11 +39,15 @@ type UiMessage = {
 export default function AssistantScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const params = useLocalSearchParams<{ suggest?: string }>();
   const listRef = useRef<FlatList<UiMessage>>(null);
   const inputRef = useRef<TextInput>(null);
+  const composerLift = useRef(new Animated.Value(0)).current;
+  const composerEnter = useRef(new Animated.Value(28)).current;
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [messages, setMessages] = useState<UiMessage[]>([
     {
       id: 'welcome',
@@ -49,6 +56,8 @@ export default function AssistantScreen() {
         "Hi — type below and send any question about your balance, spending, goals, or imports. I only answer finance questions about your account.",
     },
   ]);
+
+  const configured = isOpenRouterConfigured();
 
   const quickPrompts = useMemo(() => {
     if (typeof params.suggest === 'string' && params.suggest.trim()) {
@@ -61,10 +70,58 @@ export default function AssistantScreen() {
     return DEFAULT_PROMPTS;
   }, [params.suggest]);
 
+  /** Cap composer growth on short phones / when keyboard owns the bottom. */
+  const inputMaxHeight = useMemo(() => {
+    const ratio = keyboardVisible ? 0.12 : 0.18;
+    const softCap = keyboardVisible ? 96 : 140;
+    return Math.min(softCap, Math.max(56, Math.round(windowHeight * ratio)));
+  }, [keyboardVisible, windowHeight]);
+
   useEffect(() => {
-    const t = setTimeout(() => inputRef.current?.focus(), 350);
+    // Ease the composer in above the floating tab / system nav when chat opens.
+    Animated.spring(composerEnter, {
+      toValue: 0,
+      speed: 18,
+      bounciness: 5,
+      useNativeDriver: true,
+    }).start();
+    const t = setTimeout(() => inputRef.current?.focus(), 380);
     return () => clearTimeout(t);
-  }, []);
+  }, [composerEnter]);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const onShow = (e: { duration?: number; endCoordinates: { height: number } }) => {
+      setKeyboardVisible(true);
+      // Ease composer above the system nav / home indicator as the keyboard rises.
+      // Android uses softwareKeyboardLayoutMode=resize, so we only animate a light lift.
+      const lift = Platform.OS === 'ios' ? 0 : Math.min(8, Math.max(0, e.endCoordinates.height * 0.02));
+      Animated.timing(composerLift, {
+        toValue: lift,
+        duration: typeof e.duration === 'number' && e.duration > 0 ? e.duration : 220,
+        useNativeDriver: true,
+      }).start();
+      requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+    };
+
+    const onHide = (e: { duration?: number }) => {
+      setKeyboardVisible(false);
+      Animated.timing(composerLift, {
+        toValue: 0,
+        duration: typeof e.duration === 'number' && e.duration > 0 ? e.duration : 180,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    const showSub = Keyboard.addListener(showEvent, onShow);
+    const hideSub = Keyboard.addListener(hideEvent, onHide);
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [composerLift]);
 
   const sendPrompt = async (text: string) => {
     const trimmed = text.trim();
@@ -117,17 +174,24 @@ export default function AssistantScreen() {
     }
   };
 
+  const composerPadBottom = keyboardVisible
+    ? Platform.OS === 'ios'
+      ? 10
+      : 12
+    : Math.max(insets.bottom, 12);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? Math.max(insets.top, 8) : 0}
       >
         <View style={styles.header}>
           <View style={styles.headerTop}>
             <TouchableOpacity
               onPress={() => {
+                Keyboard.dismiss();
                 if (router.canGoBack()) router.back();
                 else router.replace('/(tabs)');
               }}
@@ -138,30 +202,39 @@ export default function AssistantScreen() {
             </TouchableOpacity>
             <View style={styles.headerCopy}>
               <Text style={styles.eyebrow}>Copilot</Text>
-              <Text style={styles.title}>Ask your ledger</Text>
+              <Text style={styles.title} numberOfLines={1}>
+                Ask your ledger
+              </Text>
             </View>
           </View>
+          {!configured ? (
+            <Text style={styles.configHint}>
+              OpenRouter key missing — add EXPO_PUBLIC_OPENROUTER_API_KEY and rebuild.
+            </Text>
+          ) : null}
         </View>
 
-        <View style={styles.quickPrompts}>
-          <FlatList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyboardShouldPersistTaps="always"
-            data={quickPrompts}
-            keyExtractor={(item) => item}
-            contentContainerStyle={styles.promptsContainer}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.promptButton}
-                onPress={() => sendPrompt(item)}
-                disabled={loading}
-              >
-                <Text style={styles.promptText}>{item}</Text>
-              </TouchableOpacity>
-            )}
-          />
-        </View>
+        {!keyboardVisible || windowHeight > 720 ? (
+          <View style={styles.quickPrompts}>
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="always"
+              data={quickPrompts}
+              keyExtractor={(item) => item}
+              contentContainerStyle={styles.promptsContainer}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.promptButton}
+                  onPress={() => sendPrompt(item)}
+                  disabled={loading}
+                >
+                  <Text style={styles.promptText}>{item}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        ) : null}
 
         <FlatList
           ref={listRef}
@@ -199,11 +272,23 @@ export default function AssistantScreen() {
           }
         />
 
-        <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+        <Animated.View
+          style={[
+            styles.inputContainer,
+            {
+              paddingBottom: composerPadBottom,
+              transform: [
+                {
+                  translateY: Animated.add(composerEnter, Animated.multiply(composerLift, -1)),
+                },
+              ],
+            },
+          ]}
+        >
           <TextInput
             ref={inputRef}
-            style={styles.input}
-            placeholder="Type your question here…"
+            style={[styles.input, { maxHeight: inputMaxHeight }]}
+            placeholder="Chat about your money…"
             placeholderTextColor={theme.colors.muted}
             value={message}
             onChangeText={setMessage}
@@ -215,6 +300,9 @@ export default function AssistantScreen() {
             autoCorrect
             autoCapitalize="sentences"
             textAlignVertical="top"
+            onFocus={() => {
+              requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+            }}
           />
           <Pressable
             style={({ pressed }) => [
@@ -228,7 +316,7 @@ export default function AssistantScreen() {
           >
             <MaterialCommunityIcons name="send" size={20} color={theme.colors.white} />
           </Pressable>
-        </View>
+        </Animated.View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -262,7 +350,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerCopy: { flex: 1 },
+  headerCopy: { flex: 1, minWidth: 0 },
   eyebrow: {
     fontSize: 12,
     letterSpacing: 1.4,
@@ -275,6 +363,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: theme.colors.ink,
     marginTop: 2,
+  },
+  configHint: {
+    marginTop: 10,
+    fontSize: 12,
+    lineHeight: 17,
+    color: theme.colors.coral,
   },
   quickPrompts: {
     paddingBottom: 4,
@@ -289,6 +383,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: theme.radius.pill,
     marginRight: 8,
+    maxWidth: 280,
   },
   promptText: {
     color: theme.colors.cedarDeep,
@@ -351,7 +446,6 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     minHeight: 52,
-    maxHeight: 140,
     backgroundColor: theme.colors.paper,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
