@@ -1,18 +1,55 @@
+import Constants from 'expo-constants';
 import { buildFinanceSystemPrompt } from '@/lib/financeContext';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
+type ExpoExtra = {
+  openRouterApiKey?: string;
+  openRouterModel?: string;
+};
+
+function readExtra(): ExpoExtra {
+  const fromConfig = Constants.expoConfig?.extra as ExpoExtra | undefined;
+  if (fromConfig) return fromConfig;
+  const legacy = (Constants as { manifest?: { extra?: ExpoExtra } }).manifest?.extra;
+  return legacy ?? {};
+}
+
+/**
+ * Resolve OpenRouter key the same way a local Expo Router / native build does:
+ * 1) Metro-inlined EXPO_PUBLIC_* (dev + export)
+ * 2) app.config.js → extra (EAS Build / Hosting when env is present at config eval)
+ */
+function getOpenRouterApiKey(): string | null {
+  const fromEnv = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY?.trim();
+  if (fromEnv) return fromEnv;
+
+  const fromExtra = readExtra().openRouterApiKey?.trim();
+  if (fromExtra) return fromExtra;
+
+  return null;
+}
+
+function getOpenRouterModel(): string {
+  const fromEnv = process.env.EXPO_PUBLIC_OPENROUTER_MODEL?.trim();
+  if (fromEnv) return fromEnv;
+
+  const fromExtra = readExtra().openRouterModel?.trim();
+  if (fromExtra) return fromExtra;
+
+  return 'meta-llama/llama-3.2-3b-instruct';
+}
+
 /** Small model — override with EXPO_PUBLIC_OPENROUTER_MODEL in .env */
-export const DEFAULT_OPENROUTER_MODEL =
-  process.env.EXPO_PUBLIC_OPENROUTER_MODEL ?? 'meta-llama/llama-3.2-3b-instruct';
+export const DEFAULT_OPENROUTER_MODEL = getOpenRouterModel();
 
 export type ChatMessage = {
   role: 'system' | 'user' | 'assistant';
   content: string;
 };
 
-function getOpenRouterApiKey(): string | null {
-  return process.env.EXPO_PUBLIC_OPENROUTER_API_KEY?.trim() || null;
+export function isOpenRouterConfigured(): boolean {
+  return Boolean(getOpenRouterApiKey());
 }
 
 export async function askOpenRouter(
@@ -22,7 +59,7 @@ export async function askOpenRouter(
   const apiKey = getOpenRouterApiKey();
   if (!apiKey) {
     throw new Error(
-      'AI is not configured. Restart the app after setting EXPO_PUBLIC_OPENROUTER_API_KEY in .env.',
+      'AI is not configured. Set EXPO_PUBLIC_OPENROUTER_API_KEY in .env (local) or the Expo project environment (EAS), then rebuild / restart with a cleared cache.',
     );
   }
 
@@ -43,7 +80,7 @@ export async function askOpenRouter(
       'X-Title': 'Financial Copilot',
     },
     body: JSON.stringify({
-      model: DEFAULT_OPENROUTER_MODEL,
+      model: getOpenRouterModel(),
       messages,
       temperature: 0.3,
       max_tokens: 450,

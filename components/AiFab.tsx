@@ -1,8 +1,9 @@
 import React from 'react';
-import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { tabBarClearance } from '@/constants/layout';
 import { theme } from '@/constants/theme';
 import { haptic } from '@/lib/haptics';
 
@@ -26,7 +27,7 @@ export default function AiFab() {
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
-  const bottom = (Platform.OS === 'ios' ? 24 : 16) + 72 + 12 + Math.max(insets.bottom - 8, 0);
+  const bottom = tabBarClearance(insets.bottom);
 
   return (
     <View pointerEvents="box-none" style={[styles.wrap, { bottom }]}>

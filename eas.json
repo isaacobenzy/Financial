@@ -14,7 +14,8 @@
       },
       "env": {
         "EAS_BUILD_NO_EXPO_GO_WARNING": "true"
-      }
+      },
+      "environment": "development"
     },
     "preview": {
       "distribution": "internal",
@@ -25,7 +26,8 @@
       },
       "env": {
         "EAS_BUILD_NO_EXPO_GO_WARNING": "true"
-      }
+      },
+      "environment": "preview"
     },
     "production": {
       "channel": "production",
@@ -35,7 +37,8 @@
       },
       "env": {
         "EAS_BUILD_NO_EXPO_GO_WARNING": "true"
-      }
+      },
+      "environment": "production"
     }
   },
   "submit": {
