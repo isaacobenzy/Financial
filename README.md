@@ -192,27 +192,28 @@ eas init                    # writes expo.extra.eas.projectId into app.json
 
 Commit the updated `app.json` (with `projectId`). Add a GitHub secret `EXPO_TOKEN` from [expo.dev/settings/access-tokens](https://expo.dev/settings/access-tokens).
 
-### 2. Android install link (internal distribution)
+### 2. Android install link (BetLive-style internal distribution)
+
+Same flow BetLive uses for testers ([internal distribution](https://docs.expo.dev/tutorial/eas/internal-distribution-builds/)):
 
 ```bash
-pnpm build:android:preview
-# same as: eas build --platform android --profile preview
+pnpm build:android:preview          # shareable APK (no Metro needed)
+# optional JS-only updates after they install once:
+pnpm update:preview -- "Fix goals toast"
 ```
 
-When the build finishes, open the EAS build page → **Install** / share the link. Testers install the **.apk** (no Metro server needed). See [internal distribution builds](https://docs.expo.dev/tutorial/eas/internal-distribution-builds/).
+When the build finishes: EAS dashboard → **Install** / QR → share that link.  
+After the APK is installed, `eas update --channel preview` ships new JS without rebuilding native (BetLive’s “preview update” pattern).
 
-GitHub Actions: workflow **EAS Build** (Android only, `preview` by default).
+EAS Workflows (repo): `.eas/workflows/android-preview-build.yml`, `publish-preview-update.yml`.
 
 ### 3. Web preview URL (EAS Hosting)
 
 ```bash
 pnpm deploy:web
-# or: pnpm export:web && eas deploy
 ```
 
-First run asks for a preview subdomain; you get a URL like `https://your-app.expo.app/`. Guide: [EAS Hosting get started](https://docs.expo.dev/eas/hosting/get-started/).
-
-GitHub Actions: workflow **EAS Web Hosting** on `main` or manual dispatch.
+You get a URL like `https://your-app.expo.app/` ([EAS Hosting](https://docs.expo.dev/eas/hosting/get-started/)). GitHub: **EAS Web Hosting** workflow.
 
 ### Expo Go limits
 

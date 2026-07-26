@@ -169,7 +169,8 @@ export async function sendViaExpoPushService(params: {
   data?: Record<string, unknown>;
   channelId?: string;
 }): Promise<boolean> {
-  const to = cachedExpoPushToken ?? (await registerForPushNotifications());
+  // Prefer cached token — never block UI waiting on re-registration
+  const to = cachedExpoPushToken;
   if (!to) return false;
 
   const category = params.category ?? 'general';

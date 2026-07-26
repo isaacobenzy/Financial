@@ -1,0 +1,28 @@
+# BetLive-style: shareable Android APK for testers (no Apple account).
+# Install link appears on the EAS build page when finished.
+
+name: Android Preview Build
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - main
+
+concurrency:
+  cancel_in_progress: true
+  group: ${{ workflow.filename }}-${{ github.ref }}
+
+defaults:
+  tools:
+    node: '20'
+    pnpm: '10'
+
+jobs:
+  build_android_preview:
+    name: Build Android preview APK
+    type: build
+    params:
+      platform: android
+      profile: preview
+      message: Preview APK for testers

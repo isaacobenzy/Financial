@@ -1,0 +1,34 @@
+# Same idea as BetLive: publish an EAS Update so testers with a preview/dev
+# APK can open a QR/link without needing your Metro server.
+
+name: Publish Preview Update
+
+on:
+  pull_request:
+    branches:
+      - staging
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+  workflow_dispatch: {}
+
+concurrency:
+  cancel_in_progress: true
+  group: ${{ workflow.filename }}-${{ github.ref }}
+
+defaults:
+  tools:
+    node: '20'
+    pnpm: '10'
+
+jobs:
+  publish_preview_update:
+    name: Publish preview update
+    type: update
+    params:
+      branch: preview
+      platform: android
+      message: Preview update for Financial Copilot testers

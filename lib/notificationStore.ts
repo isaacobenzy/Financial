@@ -34,9 +34,10 @@ export const useNotificationStore = create<NotificationStore>((set) => ({
 
   add: (notification) => {
     const id = `notification-${++notificationId}`;
-    set((state) => ({
-      notifications: [...state.notifications, { ...notification, id }],
-    }));
+    // Replace queue — one snappy toast at a time (original ToastHost feel)
+    set({
+      notifications: [{ ...notification, id }],
+    });
 
     const duration = notification.duration ?? 0;
     if (duration > 0) {

@@ -52,28 +52,28 @@ export async function notifyUser(
     }
   }
 
-  try {
-    const { sendActivityPush } = await import('@/lib/pushNotifications');
-    await sendActivityPush({
-      title,
-      body,
-      category: categoryFor(kind),
-      skipToastFallback: !options?.silentToast,
-      data: {
-        ...options?.data,
-        href:
-          options?.data?.screen === 'goals'
-            ? '/(tabs)/goals'
-            : options?.data?.screen === 'assistant'
-              ? '/assistant'
-              : options?.data?.screen === 'transactions'
-                ? '/transactions'
-                : '/(tabs)',
-      },
-    });
-  } catch {
-    // toast already shown
-  }
+  // Push in background — never delay the in-app toast
+  void import('@/lib/pushNotifications')
+    .then(({ sendActivityPush }) =>
+      sendActivityPush({
+        title,
+        body,
+        category: categoryFor(kind),
+        skipToastFallback: true,
+        data: {
+          ...options?.data,
+          href:
+            options?.data?.screen === 'goals'
+              ? '/(tabs)/goals'
+              : options?.data?.screen === 'assistant'
+                ? '/assistant'
+                : options?.data?.screen === 'transactions'
+                  ? '/transactions'
+                  : '/(tabs)',
+        },
+      }),
+    )
+    .catch(() => undefined);
 }
 
 export async function scheduleStreakReminder(): Promise<void> {

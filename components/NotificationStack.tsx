@@ -1,12 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Animated,
-  Platform,
-} from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -15,17 +8,12 @@ import {
 } from '@/lib/notificationStore';
 import { theme } from '@/constants/theme';
 
-const TOAST_BG = '#1a1c1f';
-const TOAST_BORDER = 'rgba(255,255,255,0.14)';
-const TOAST_TITLE = '#F4F6FB';
-const TOAST_BODY = 'rgba(244,246,251,0.78)';
-const TOAST_MUTED = 'rgba(244,246,251,0.55)';
-
+/** Your original light toast look — paper cards, brand accents. */
 const ACCENT: Record<NotificationType, string> = {
   success: theme.colors.mint,
   error: theme.colors.coral,
-  warning: '#F5B942',
-  info: '#5AD1E5',
+  warning: theme.colors.brass,
+  info: theme.colors.brass,
 };
 
 const ICONS: Record<NotificationType, keyof typeof MaterialCommunityIcons.glyphMap> = {
@@ -35,7 +23,7 @@ const ICONS: Record<NotificationType, keyof typeof MaterialCommunityIcons.glyphM
   info: 'information',
 };
 
-function NotificationItem({
+function ToastCard({
   id,
   type,
   title,
@@ -50,159 +38,124 @@ function NotificationItem({
   action?: { label: string; onPress: () => void };
   onDismiss: (id: string) => void;
 }) {
-  const slideAnim = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(-16)).current;
   const accent = ACCENT[type];
 
   useEffect(() => {
-    Animated.spring(slideAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      friction: 8,
-      tension: 80,
-    }).start();
-  }, [slideAnim]);
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.spring(translateY, { toValue: 0, useNativeDriver: true, speed: 20, bounciness: 6 }),
+    ]).start();
+  }, [opacity, translateY]);
 
-  const handleDismiss = () => {
-    Animated.timing(slideAnim, {
-      toValue: 0,
-      duration: 220,
-      useNativeDriver: true,
-    }).start(() => onDismiss(id));
+  const hide = () => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 0, duration: 160, useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: -16, duration: 160, useNativeDriver: true }),
+    ]).start(() => onDismiss(id));
   };
 
-  const translateY = slideAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-100, 0],
-  });
-  const opacity = slideAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
-
   return (
-    <Animated.View style={[styles.item, { transform: [{ translateY }], opacity }]}>
-      <View
-        style={[
-          styles.card,
-          { backgroundColor: TOAST_BG, borderColor: TOAST_BORDER, borderLeftColor: accent },
-        ]}
-        accessibilityRole="alert"
-      >
-        <View style={[styles.iconWrap, { backgroundColor: `${accent}22` }]}>
-          <MaterialCommunityIcons name={ICONS[type]} size={22} color={accent} />
-        </View>
-        <View style={styles.copy}>
-          {title ? (
-            <Text style={styles.title} numberOfLines={1}>
-              {title}
-            </Text>
-          ) : null}
-          <Text style={styles.message} numberOfLines={3}>
-            {message}
-          </Text>
-          {action ? (
-            <TouchableOpacity
-              onPress={action.onPress}
-              style={[styles.actionBtn, { borderColor: accent }]}
-              hitSlop={8}
-            >
-              <Text style={[styles.actionLabel, { color: accent }]}>{action.label}</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-        <TouchableOpacity onPress={handleDismiss} style={styles.close} hitSlop={10}>
-          <MaterialCommunityIcons name="close" size={18} color={TOAST_MUTED} />
-        </TouchableOpacity>
+    <Animated.View style={[styles.card, { opacity, transform: [{ translateY }] }]}>
+      <View style={[styles.accent, { backgroundColor: accent }]} />
+      <View style={[styles.iconWrap, { backgroundColor: `${accent}22` }]}>
+        <MaterialCommunityIcons name={ICONS[type]} size={22} color={accent} />
       </View>
+      <View style={styles.copy}>
+        {title ? <Text style={styles.title}>{title}</Text> : null}
+        <Text style={styles.message}>{message}</Text>
+        {action ? (
+          <Pressable onPress={action.onPress} style={styles.action}>
+            <Text style={[styles.actionText, { color: accent }]}>{action.label}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+      <Pressable onPress={hide} hitSlop={10} style={styles.close}>
+        <MaterialCommunityIcons name="close" size={18} color={theme.colors.muted} />
+      </Pressable>
     </Animated.View>
   );
 }
 
-/** Global toast stack — mount above navigation. */
+/** Global in-app alerts — original Financial Copilot toast UI. */
 export default function NotificationStack() {
   const notifications = useNotificationStore((s) => s.notifications);
   const remove = useNotificationStore((s) => s.remove);
   const insets = useSafeAreaInsets();
 
-  if (notifications.length === 0) return null;
+  // Latest only — snappy like the previous ToastHost
+  const toast = notifications[notifications.length - 1];
+  if (!toast) return null;
 
   return (
-    <View
-      style={[styles.stack, { top: Math.max(insets.top, 8) + 8 }]}
-      pointerEvents="box-none"
-    >
-      {notifications.map((n) => (
-        <NotificationItem
-          key={n.id}
-          id={n.id}
-          type={n.type}
-          title={n.title}
-          message={n.message}
-          action={n.action}
-          onDismiss={remove}
-        />
-      ))}
+    <View pointerEvents="box-none" style={[styles.root, { paddingTop: insets.top + 8 }]}>
+      <ToastCard
+        key={toast.id}
+        id={toast.id}
+        type={toast.type}
+        title={toast.title}
+        message={toast.message}
+        action={toast.action}
+        onDismiss={remove}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  stack: {
+  root: {
     position: 'absolute',
-    left: 16,
-    right: 16,
-    zIndex: 99999,
-    elevation: 99999,
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    paddingHorizontal: 16,
   },
-  item: { marginBottom: 8 },
   card: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderRadius: theme.radius.md,
+    alignItems: 'center',
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.radius.lg,
     borderWidth: 1,
-    borderLeftWidth: 4,
-    gap: 12,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.45,
-        shadowRadius: 16,
-      },
-      android: { elevation: 12 },
-      default: {},
-    }),
+    borderColor: theme.colors.line,
+    overflow: 'hidden',
+    paddingRight: 8,
+    ...theme.shadow.soft,
+    shadowOpacity: 0.16,
+    elevation: 8,
+  },
+  accent: {
+    width: 5,
+    alignSelf: 'stretch',
   },
   iconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: theme.radius.sm,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: 12,
   },
-  copy: { flex: 1, minWidth: 0, paddingTop: 1 },
+  copy: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+  },
   title: {
     fontSize: 14,
     fontWeight: '700',
-    lineHeight: 18,
-    color: TOAST_TITLE,
-    marginBottom: 2,
+    color: theme.colors.ink,
   },
   message: {
     fontSize: 13,
+    color: theme.colors.muted,
+    marginTop: 2,
     lineHeight: 18,
-    color: TOAST_BODY,
   },
-  actionBtn: {
-    alignSelf: 'flex-start',
-    marginTop: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: theme.radius.sm,
-    borderWidth: 1,
+  action: { marginTop: 8 },
+  actionText: { fontSize: 13, fontWeight: '700' },
+  close: {
+    padding: 8,
   },
-  actionLabel: { fontSize: 12, fontWeight: '700' },
-  close: { padding: 4, marginTop: 2 },
 });

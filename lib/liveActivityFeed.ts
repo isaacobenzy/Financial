@@ -36,24 +36,29 @@ export async function emitActivityPulse(params: {
             ? 'insight_alerts'
             : 'ledger_live';
 
-  const { sendActivityPush } = await import('@/lib/pushNotifications');
-  await sendActivityPush({
-    title: params.title,
-    body: params.body,
-    category,
-    data: {
-      href:
-        params.href ||
-        (params.kind === 'goal'
-          ? '/(tabs)/goals'
-          : params.kind === 'import'
-            ? '/import-sms'
-            : '/(tabs)'),
-      goalId: params.goalId,
-      screen:
-        params.kind === 'goal' ? 'goals' : params.kind === 'import' ? 'import' : 'home',
-    },
-  });
+  // Fire-and-forget push so UI stays responsive
+  void import('@/lib/pushNotifications')
+    .then(({ sendActivityPush }) =>
+      sendActivityPush({
+        title: params.title,
+        body: params.body,
+        category,
+        skipToastFallback: true,
+        data: {
+          href:
+            params.href ||
+            (params.kind === 'goal'
+              ? '/(tabs)/goals'
+              : params.kind === 'import'
+                ? '/import-sms'
+                : '/(tabs)'),
+          goalId: params.goalId,
+          screen:
+            params.kind === 'goal' ? 'goals' : params.kind === 'import' ? 'import' : 'home',
+        },
+      }),
+    )
+    .catch(() => undefined);
 }
 
 export async function publishLedgerLiveFromSnapshot() {
