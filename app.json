@@ -58,9 +58,13 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 280,
+          "imageWidth": 260,
           "resizeMode": "contain",
-          "backgroundColor": "#F3F7F4"
+          "backgroundColor": "#F3F7F4",
+          "dark": {
+            "image": "./assets/images/splash-icon.png",
+            "backgroundColor": "#0F2A20"
+          }
         }
       ],
       [
@@ -74,13 +78,20 @@
         {
           "icon": "./assets/images/notification-icon.png",
           "color": "#1B4332",
-          "defaultChannel": "ledger",
+          "defaultChannel": "default",
           "sounds": []
         }
       ]
     ],
     "experiments": {
       "typedRoutes": false
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "7659da44-7576-4f69-a623-cc9a77d973f6"
+      }
+    },
+    "owner": "isaacobengz"
   }
 }

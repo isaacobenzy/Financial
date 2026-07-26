@@ -6,11 +6,15 @@
   "engines": {
     "node": ">=20.19.4"
   },
+  "packageManager": "pnpm@10.12.1",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "export:web": "expo export --platform web",
+    "deploy:web": "pnpm export:web && eas deploy",
+    "build:android:preview": "eas build --platform android --profile preview",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "test": "jest --watchAll",

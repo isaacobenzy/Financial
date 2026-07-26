@@ -11,11 +11,41 @@ export type NotifyKind =
   | 'streak'
   | 'info';
 
+type NotificationsModule = {
+  AndroidImportance: { DEFAULT: number; HIGH: number; LOW: number };
+  AndroidNotificationPriority?: { LOW: number };
+  AndroidNotificationVisibility?: { PUBLIC: number };
+  SchedulableTriggerInputTypes: { DATE: string };
+  setNotificationChannelAsync: (id: string, options: Record<string, unknown>) => Promise<unknown>;
+  setNotificationCategoryAsync: (
+    id: string,
+    actions: Array<Record<string, unknown>>,
+  ) => Promise<unknown>;
+  setNotificationHandler: (handler: {
+    handleNotification: () => Promise<Record<string, unknown>>;
+  }) => void;
+  getPermissionsAsync: () => Promise<{ status?: string; granted?: boolean }>;
+  requestPermissionsAsync: () => Promise<{ status?: string; granted?: boolean }>;
+  scheduleNotificationAsync: (request: Record<string, unknown>) => Promise<string>;
+  getAllScheduledNotificationsAsync: () => Promise<Array<{ content: { data?: { kind?: string } } }>>;
+  dismissNotificationAsync: (id: string) => Promise<void>;
+  addNotificationResponseReceivedListener: (
+    listener: (response: unknown) => void,
+  ) => { remove: () => void };
+};
+
 let categoriesReady = false;
 
-async function ensureChannelsAndCategories(
-  Notifications: typeof import('expo-notifications'),
-): Promise<void> {
+async function loadNotifications(): Promise<NotificationsModule | null> {
+  if (!supportsSystemNotifications()) return null;
+  try {
+    return (await import('expo-notifications')) as unknown as NotificationsModule;
+  } catch {
+    return null;
+  }
+}
+
+async function ensureChannelsAndCategories(Notifications: NotificationsModule): Promise<void> {
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('ledger', {
       name: 'Ledger updates',
@@ -51,7 +81,7 @@ async function ensureChannelsAndCategories(
 
 /**
  * In-app toast always. System notifications only in a development / production build
- * (never import expo-notifications inside Expo Go — it throws on Android).
+ * (never import expo-notifications inside Expo Go — it errors on Android SDK 53+).
  */
 export async function notifyUser(
   title: string,
@@ -72,12 +102,11 @@ export async function notifyUser(
     }
   }
 
-  if (!supportsSystemNotifications()) return;
+  const Notifications = await loadNotifications();
+  if (!Notifications) return;
 
   try {
-    const Notifications = await import('expo-notifications');
-
-    await Notifications.setNotificationHandler({
+    Notifications.setNotificationHandler({
       handleNotification: async () => ({
         shouldShowBanner: true,
         shouldShowList: true,
@@ -87,10 +116,10 @@ export async function notifyUser(
     });
 
     const perms = await Notifications.getPermissionsAsync();
-    let status = (perms as { status?: string }).status;
+    let status = perms.status;
     if (status !== 'granted') {
       const asked = await Notifications.requestPermissionsAsync();
-      status = (asked as { status?: string }).status;
+      status = asked.status;
     }
     if (status !== 'granted') return;
 
@@ -104,10 +133,15 @@ export async function notifyUser(
       content: {
         title,
         body,
-        sound: kind === 'goal' || kind === 'anomaly' ? 'default' : false,
+        sound: kind === 'goal' || kind === 'anomaly' || kind === 'login' ? 'default' : false,
         data: { kind, ...(options?.data || {}) },
         ...(options?.categoryId ? { categoryIdentifier: options.categoryId } : {}),
-        ...(Platform.OS === 'android' ? { channelId } : {}),
+        ...(Platform.OS === 'android'
+          ? {
+              channelId,
+              color: '#1B4332',
+            }
+          : {}),
       },
       trigger: null,
     });
@@ -117,11 +151,11 @@ export async function notifyUser(
 }
 
 export async function scheduleStreakReminder(): Promise<void> {
-  if (!supportsSystemNotifications()) return;
+  const Notifications = await loadNotifications();
+  if (!Notifications) return;
   try {
-    const Notifications = await import('expo-notifications');
     const perms = await Notifications.getPermissionsAsync();
-    if ((perms as { status?: string }).status !== 'granted') return;
+    if (perms.status !== 'granted') return;
 
     await ensureChannelsAndCategories(Notifications);
 
@@ -143,7 +177,7 @@ export async function scheduleStreakReminder(): Promise<void> {
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
         date: trigger,
-      } as never,
+      },
     });
   } catch {
     // ignore

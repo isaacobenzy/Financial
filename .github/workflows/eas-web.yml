@@ -1,28 +1,21 @@
-name: EAS Build
+name: EAS Web Hosting
+
+# Deploys the Expo web export to EAS Hosting (shareable preview URL).
+# Docs: https://docs.expo.dev/eas/hosting/get-started/
 
 on:
   workflow_dispatch:
-    inputs:
-      profile:
-        description: EAS build profile
-        required: true
-        default: preview
-        type: choice
-        options:
-          - development
-          - preview
-          - production
   push:
     branches:
       - main
 
 concurrency:
-  group: eas-build-${{ github.ref }}
-  cancel-in-progress: false
+  group: eas-web-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
-    name: Trigger EAS Android build
+  deploy:
+    name: Export web & eas deploy
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -31,7 +24,6 @@ jobs:
           if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
             echo "Missing EXPO_TOKEN repository secret."
             echo "Create one at https://expo.dev/settings/access-tokens"
-            echo "then add it under GitHub → Settings → Secrets and variables → Actions."
             exit 1
           fi
 
@@ -68,14 +60,8 @@ jobs:
             exit 1
           fi
 
-      # Android only — no Apple Developer account required.
-      # See: https://docs.expo.dev/tutorial/eas/internal-distribution-builds/
-      - name: Build Android on EAS
-        env:
-          EAS_BUILD_NO_EXPO_GO_WARNING: 'true'
-        run: >
-          eas build
-          --platform android
-          --profile ${{ github.event.inputs.profile || 'preview' }}
-          --non-interactive
-          --no-wait
+      - name: Export web
+        run: pnpm export:web
+
+      - name: Deploy to EAS Hosting
+        run: eas deploy --non-interactive --prod

@@ -70,7 +70,6 @@ export default function AssistantScreen() {
     const trimmed = text.trim();
     if (!trimmed || loading) return;
 
-    void haptic('light');
     const userMsg: UiMessage = {
       id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       role: 'user',
@@ -89,7 +88,7 @@ export default function AssistantScreen() {
       const prior = history.slice(0, -1);
       const reply = await askOpenRouter(trimmed, prior);
       await recordActivity();
-      void haptic('success');
+      void haptic('success', 'ai');
       setMessages((prev) => [
         ...prev,
         {
@@ -100,7 +99,6 @@ export default function AssistantScreen() {
       ]);
     } catch (error) {
       const detail = error instanceof Error ? error.message : 'Something went wrong';
-      void haptic('error');
       toast.error(detail, 'AI unavailable');
       setMessages((prev) => [
         ...prev,
@@ -130,7 +128,6 @@ export default function AssistantScreen() {
           <View style={styles.headerTop}>
             <TouchableOpacity
               onPress={() => {
-                void haptic('selection');
                 if (router.canGoBack()) router.back();
                 else router.replace('/(tabs)');
               }}

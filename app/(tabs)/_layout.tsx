@@ -38,7 +38,7 @@ export default function TabLayout() {
       }}
       screenListeners={{
         tabPress: () => {
-          void haptic('selection');
+          void haptic('selection', 'tab');
         },
       }}
     >
