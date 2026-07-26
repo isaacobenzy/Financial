@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import TransactionCard from '@/components/TransactionCard';
@@ -11,6 +11,7 @@ import StreakCard from '@/components/StreakCard';
 import AiFab from '@/components/AiFab';
 import HomeLiveWidget from '@/components/HomeLiveWidget';
 import ProfileEditModal from '@/components/ProfileEditModal';
+import { tabContentPaddingBottom } from '@/constants/layout';
 import { theme } from '@/constants/theme';
 import { onAppOpenHygiene } from '@/lib/insightsNotify';
 import { getSession, type UserSession } from '@/lib/session';
@@ -21,6 +22,7 @@ const STALE_MS = 7 * 24 * 60 * 60 * 1000;
 
 export default function HomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [session, setSession] = useState<UserSession | null>(null);
   const [needsImportCta, setNeedsImportCta] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -71,7 +73,7 @@ export default function HomeScreen() {
 
       <ScrollView
         style={styles.content}
-        contentContainerStyle={styles.contentInner}
+        contentContainerStyle={[styles.contentInner, { paddingBottom: tabContentPaddingBottom(insets.bottom) }]}
         showsVerticalScrollIndicator={false}
       >
         <BalanceHeader />
@@ -168,7 +170,7 @@ const styles = StyleSheet.create({
     ...theme.shadow.soft,
   },
   content: { flex: 1 },
-  contentInner: { paddingBottom: 130 },
+  contentInner: {},
   importHero: {
     marginHorizontal: 16,
     marginTop: 16,

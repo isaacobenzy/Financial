@@ -7,7 +7,7 @@ import { theme } from '@/constants/theme';
 const DISMISS_KEY = 'web_preview_banner_dismissed_v1';
 
 /**
- * Subtle, dismissible notice for the shareable web preview.
+ * Compact, dismissible notice for the shareable web preview.
  * Native SMS / push / biometrics need the Android APK.
  */
 export default function WebPreviewBanner() {
@@ -33,12 +33,10 @@ export default function WebPreviewBanner() {
 
   return (
     <View style={styles.wrap} accessibilityRole="summary">
-      <MaterialCommunityIcons name="monitor-cellphone" size={18} color={theme.colors.brass} />
+      <MaterialCommunityIcons name="monitor-cellphone" size={16} color={theme.colors.brass} />
       <View style={styles.copy}>
-        <Text style={styles.title}>Web preview</Text>
         <Text style={styles.body}>
-          Try the ledger, goals, and AI here. SMS inbox, push alerts, and biometrics need the
-          Android preview APK.
+          Web preview — SMS, push, and biometrics need the Android APK.
         </Text>
       </View>
       <TouchableOpacity
@@ -49,7 +47,7 @@ export default function WebPreviewBanner() {
         hitSlop={10}
         accessibilityLabel="Dismiss web preview notice"
       >
-        <MaterialCommunityIcons name="close" size={18} color={theme.colors.muted} />
+        <MaterialCommunityIcons name="close" size={16} color={theme.colors.muted} />
       </TouchableOpacity>
     </View>
   );
@@ -58,29 +56,22 @@ export default function WebPreviewBanner() {
 const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    marginHorizontal: 16,
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 14,
     marginTop: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
     borderRadius: theme.radius.md,
-    backgroundColor: 'rgba(27, 67, 50, 0.06)',
+    backgroundColor: theme.colors.sageWash,
     borderWidth: 1,
     borderColor: theme.colors.line,
   },
-  copy: { flex: 1, gap: 2 },
-  title: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-    color: theme.colors.cedar,
-  },
+  copy: { flex: 1 },
   body: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: theme.colors.muted,
-    fontWeight: '500',
+    fontSize: 12,
+    lineHeight: 16,
+    color: theme.colors.cedarDeep,
+    fontWeight: '600',
   },
 });

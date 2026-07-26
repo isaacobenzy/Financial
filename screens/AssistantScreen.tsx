@@ -34,7 +34,35 @@ type UiMessage = {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  tone?: 'error';
 };
+
+function friendlyAiFailure(detail: string): { toast: string; bubble: string } {
+  const lower = detail.toLowerCase();
+  if (lower.includes('not configured') || lower.includes('expo_public_openrouter')) {
+    return {
+      toast: 'This build is missing the OpenRouter API key.',
+      bubble:
+        'I can’t reach the AI service yet. Set EXPO_PUBLIC_OPENROUTER_API_KEY for this environment, then rebuild or restart with a cleared cache.',
+    };
+  }
+  if (lower.includes('401') || lower.includes('unauthorized') || lower.includes('invalid api')) {
+    return {
+      toast: 'The OpenRouter key was rejected.',
+      bubble: 'Authentication with the AI service failed. Check that your OpenRouter key is valid and has credit.',
+    };
+  }
+  if (lower.includes('network') || lower.includes('fetch') || lower.includes('failed to fetch')) {
+    return {
+      toast: 'Network issue — check your connection and try again.',
+      bubble: 'I couldn’t reach the AI service. Check your connection, then send your question again.',
+    };
+  }
+  return {
+    toast: 'Couldn’t get a reply just now. Try again in a moment.',
+    bubble: 'I couldn’t answer that just now. Please try again in a moment.',
+  };
+}
 
 export default function AssistantScreen() {
   const router = useRouter();
@@ -53,7 +81,7 @@ export default function AssistantScreen() {
       id: 'welcome',
       role: 'assistant',
       content:
-        "Hi — type below and send any question about your balance, spending, goals, or imports. I only answer finance questions about your account.",
+        'Hi — type below and send any question about your balance, spending, goals, or imports. I only answer finance questions about your account.',
     },
   ]);
 
@@ -78,7 +106,6 @@ export default function AssistantScreen() {
   }, [keyboardVisible, windowHeight]);
 
   useEffect(() => {
-    // Ease the composer in above the floating tab / system nav when chat opens.
     Animated.spring(composerEnter, {
       toValue: 0,
       speed: 18,
@@ -95,8 +122,6 @@ export default function AssistantScreen() {
 
     const onShow = (e: { duration?: number; endCoordinates: { height: number } }) => {
       setKeyboardVisible(true);
-      // Ease composer above the system nav / home indicator as the keyboard rises.
-      // Android uses softwareKeyboardLayoutMode=resize, so we only animate a light lift.
       const lift = Platform.OS === 'ios' ? 0 : Math.min(8, Math.max(0, e.endCoordinates.height * 0.02));
       Animated.timing(composerLift, {
         toValue: lift,
@@ -156,13 +181,15 @@ export default function AssistantScreen() {
       ]);
     } catch (error) {
       const detail = error instanceof Error ? error.message : 'Something went wrong';
-      notificationService.error(detail, 'AI unavailable');
+      const friendly = friendlyAiFailure(detail);
+      notificationService.error(friendly.toast, 'AI unavailable');
       setMessages((prev) => [
         ...prev,
         {
           id: `e-${Date.now()}`,
           role: 'assistant',
-          content: `I couldn't answer that just now.\n\n${detail}`,
+          tone: 'error',
+          content: friendly.bubble,
         },
       ]);
     } finally {
@@ -208,9 +235,16 @@ export default function AssistantScreen() {
             </View>
           </View>
           {!configured ? (
-            <Text style={styles.configHint}>
-              OpenRouter key missing — add EXPO_PUBLIC_OPENROUTER_API_KEY and rebuild.
-            </Text>
+            <View style={styles.configHint}>
+              <MaterialCommunityIcons
+                name="key-alert-outline"
+                size={16}
+                color={theme.colors.coral}
+              />
+              <Text style={styles.configHintText}>
+                AI isn’t configured on this build. Add the OpenRouter key, then rebuild.
+              </Text>
+            </View>
           ) : null}
         </View>
 
@@ -245,23 +279,38 @@ export default function AssistantScreen() {
           keyboardShouldPersistTaps="always"
           keyboardDismissMode="interactive"
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
-          renderItem={({ item }) => (
-            <View
-              style={[
-                styles.bubble,
-                item.role === 'user' ? styles.userBubble : styles.assistantBubble,
-              ]}
-            >
-              <Text
+          renderItem={({ item }) => {
+            const isError = item.tone === 'error';
+            return (
+              <View
                 style={[
-                  styles.messageText,
-                  item.role === 'user' ? styles.userText : styles.assistantText,
+                  styles.bubble,
+                  item.role === 'user' ? styles.userBubble : styles.assistantBubble,
+                  isError && styles.errorBubble,
                 ]}
               >
-                {item.content}
-              </Text>
-            </View>
-          )}
+                {isError ? (
+                  <View style={styles.errorHeader}>
+                    <MaterialCommunityIcons
+                      name="alert-circle-outline"
+                      size={16}
+                      color={theme.colors.coral}
+                    />
+                    <Text style={styles.errorLabel}>Couldn’t complete</Text>
+                  </View>
+                ) : null}
+                <Text
+                  style={[
+                    styles.messageText,
+                    item.role === 'user' ? styles.userText : styles.assistantText,
+                    isError && styles.errorText,
+                  ]}
+                >
+                  {item.content}
+                </Text>
+              </View>
+            );
+          }}
           ListFooterComponent={
             loading ? (
               <View style={styles.typing}>
@@ -293,7 +342,6 @@ export default function AssistantScreen() {
             value={message}
             onChangeText={setMessage}
             multiline
-            // Keep typing available even while a reply loads
             editable
             blurOnSubmit={false}
             returnKeyType="default"
@@ -366,9 +414,22 @@ const styles = StyleSheet.create({
   },
   configHint: {
     marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.coralSoft,
+    borderWidth: 1,
+    borderColor: 'rgba(231, 111, 81, 0.28)',
+  },
+  configHintText: {
+    flex: 1,
     fontSize: 12,
     lineHeight: 17,
-    color: theme.colors.coral,
+    color: theme.colors.cedarDeep,
+    fontWeight: '600',
   },
   quickPrompts: {
     paddingBottom: 4,
@@ -408,6 +469,25 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 6,
     ...theme.shadow.soft,
   },
+  errorBubble: {
+    backgroundColor: theme.colors.white,
+    borderWidth: 1,
+    borderColor: 'rgba(231, 111, 81, 0.28)',
+    shadowOpacity: 0.04,
+  },
+  errorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  errorLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+    color: theme.colors.coral,
+  },
   userBubble: {
     alignSelf: 'flex-end',
     backgroundColor: theme.colors.cedar,
@@ -419,6 +499,9 @@ const styles = StyleSheet.create({
   },
   assistantText: {
     color: theme.colors.ink,
+  },
+  errorText: {
+    color: theme.colors.cedarDeep,
   },
   userText: {
     color: theme.colors.white,

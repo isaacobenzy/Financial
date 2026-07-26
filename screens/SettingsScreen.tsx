@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, useSegments } from 'expo-router';
 import {
   getPermissionStatuses,
@@ -18,6 +18,7 @@ import {
   type PermissionStatus,
 } from '@/lib/permissions';
 import { notificationService } from '@/lib/notificationStore';
+import { tabContentPaddingBottom } from '@/constants/layout';
 import { theme } from '@/constants/theme';
 import NaviiAvatar from '@/components/NaviiAvatar';
 import { clearSession, getSession, type UserSession } from '@/lib/session';
@@ -39,6 +40,7 @@ import {
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const segments = useSegments();
   const isTab = segments.includes('(tabs)');
   const [session, setSession] = useState<UserSession | null>(null);
@@ -131,7 +133,13 @@ export default function SettingsScreen() {
         <View style={styles.backButton} />
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={[
+          styles.contentInner,
+          { paddingBottom: tabContentPaddingBottom(insets.bottom) },
+        ]}
+      >
         <TouchableOpacity style={styles.profileCard} onPress={() => setProfileOpen(true)}>
           <NaviiAvatar
             seed={session?.naviiSeed || 'guest@financialcopilot.com'}
@@ -283,7 +291,7 @@ const styles = StyleSheet.create({
   backButton: { width: 40 },
   title: { fontSize: 20, fontWeight: '700', color: theme.colors.ink },
   content: { flex: 1 },
-  contentInner: { paddingBottom: 120 },
+  contentInner: {},
   profileCard: {
     marginTop: 20,
     marginHorizontal: 16,
