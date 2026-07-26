@@ -1,27 +1,40 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   useNotificationStore,
   type NotificationType,
 } from '@/lib/notificationStore';
+import { tabBarClearance } from '@/constants/layout';
 import { theme } from '@/constants/theme';
 
-/** Your original light toast look — paper cards, brand accents. */
 const ACCENT: Record<NotificationType, string> = {
   success: theme.colors.mint,
   error: theme.colors.coral,
   warning: theme.colors.brass,
-  info: theme.colors.brass,
+  info: theme.colors.cedar,
+};
+
+const FILL: Record<NotificationType, string> = {
+  success: theme.colors.mintSoft,
+  error: theme.colors.coralSoft,
+  warning: theme.colors.brassWash,
+  info: theme.colors.sageWash,
 };
 
 const ICONS: Record<NotificationType, keyof typeof MaterialCommunityIcons.glyphMap> = {
-  success: 'check-circle',
-  error: 'alert-circle',
-  warning: 'alert',
-  info: 'information',
+  success: 'check-circle-outline',
+  error: 'alert-circle-outline',
+  warning: 'alert-outline',
+  info: 'information-outline',
 };
+
+function truncateMessage(message: string, max = 140): string {
+  const compact = message.replace(/\s+/g, ' ').trim();
+  if (compact.length <= max) return compact;
+  return `${compact.slice(0, max - 1).trimEnd()}…`;
+}
 
 function ToastCard({
   id,
@@ -39,57 +52,88 @@ function ToastCard({
   onDismiss: (id: string) => void;
 }) {
   const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(-16)).current;
+  const enterFrom = Platform.OS === 'web' ? 18 : -16;
+  const translateY = useRef(new Animated.Value(enterFrom)).current;
   const accent = ACCENT[type];
+  const fill = FILL[type];
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
-      Animated.spring(translateY, { toValue: 0, useNativeDriver: true, speed: 20, bounciness: 6 }),
+      Animated.timing(opacity, { toValue: 1, duration: 220, useNativeDriver: true }),
+      Animated.spring(translateY, { toValue: 0, useNativeDriver: true, speed: 18, bounciness: 5 }),
     ]).start();
   }, [opacity, translateY]);
 
   const hide = () => {
     Animated.parallel([
       Animated.timing(opacity, { toValue: 0, duration: 160, useNativeDriver: true }),
-      Animated.timing(translateY, { toValue: -16, duration: 160, useNativeDriver: true }),
+      Animated.timing(translateY, {
+        toValue: enterFrom,
+        duration: 160,
+        useNativeDriver: true,
+      }),
     ]).start(() => onDismiss(id));
   };
 
   return (
-    <Animated.View style={[styles.card, { opacity, transform: [{ translateY }] }]}>
+    <Animated.View
+      style={[
+        styles.card,
+        {
+          backgroundColor: theme.colors.white,
+          borderColor: type === 'error' ? 'rgba(231, 111, 81, 0.28)' : theme.colors.line,
+          opacity,
+          transform: [{ translateY }],
+        },
+      ]}
+    >
       <View style={[styles.accent, { backgroundColor: accent }]} />
-      <View style={[styles.iconWrap, { backgroundColor: `${accent}22` }]}>
-        <MaterialCommunityIcons name={ICONS[type]} size={22} color={accent} />
+      <View style={[styles.iconWrap, { backgroundColor: fill }]}>
+        <MaterialCommunityIcons name={ICONS[type]} size={20} color={accent} />
       </View>
       <View style={styles.copy}>
         {title ? <Text style={styles.title}>{title}</Text> : null}
-        <Text style={styles.message}>{message}</Text>
+        <Text style={styles.message} numberOfLines={3}>
+          {truncateMessage(message)}
+        </Text>
         {action ? (
           <Pressable onPress={action.onPress} style={styles.action}>
             <Text style={[styles.actionText, { color: accent }]}>{action.label}</Text>
           </Pressable>
         ) : null}
       </View>
-      <Pressable onPress={hide} hitSlop={10} style={styles.close}>
+      <Pressable onPress={hide} hitSlop={10} style={styles.close} accessibilityLabel="Dismiss">
         <MaterialCommunityIcons name="close" size={18} color={theme.colors.muted} />
       </Pressable>
     </Animated.View>
   );
 }
 
-/** Global in-app alerts — original Financial Copilot toast UI. */
+/**
+ * Global in-app alerts.
+ * Web: dock above the floating tab bar so they don’t collide with the preview banner.
+ * Native: top of screen under the status bar.
+ */
 export default function NotificationStack() {
   const notifications = useNotificationStore((s) => s.notifications);
   const remove = useNotificationStore((s) => s.remove);
   const insets = useSafeAreaInsets();
 
-  // Latest only — snappy like the previous ToastHost
   const toast = notifications[notifications.length - 1];
   if (!toast) return null;
 
+  const webBottom = tabBarClearance(insets.bottom) + 8;
+
   return (
-    <View pointerEvents="box-none" style={[styles.root, { paddingTop: insets.top + 8 }]}>
+    <View
+      pointerEvents="box-none"
+      style={[
+        styles.root,
+        Platform.OS === 'web'
+          ? { bottom: webBottom, top: undefined, paddingBottom: 0 }
+          : { paddingTop: insets.top + 8 },
+      ]}
+    >
       <ToastCard
         key={toast.id}
         id={toast.id}
@@ -115,32 +159,31 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.white,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
-    borderColor: theme.colors.line,
     overflow: 'hidden',
     paddingRight: 8,
     ...theme.shadow.soft,
-    shadowOpacity: 0.16,
+    shadowOpacity: 0.14,
     elevation: 8,
   },
   accent: {
-    width: 5,
+    width: 4,
     alignSelf: 'stretch',
   },
   iconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 12,
   },
   copy: {
     flex: 1,
-    paddingVertical: 14,
+    paddingVertical: 12,
     paddingHorizontal: 12,
+    minWidth: 0,
   },
   title: {
     fontSize: 14,

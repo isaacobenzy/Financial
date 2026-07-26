@@ -10,6 +10,11 @@ export const theme = {
     brassSoft: '#E8D5C4',
     mint: '#52B788',
     coral: '#E76F51',
+    /** Soft fills for toasts / inline alerts (keep coral accent, not full red panels). */
+    coralSoft: 'rgba(231, 111, 81, 0.10)',
+    mintSoft: 'rgba(82, 183, 136, 0.12)',
+    brassWash: 'rgba(176, 137, 104, 0.14)',
+    sageWash: 'rgba(216, 229, 221, 0.65)',
     muted: '#5C6B63',
     line: '#D5E0D9',
     tabInactive: '#8A9A91',

@@ -61,7 +61,7 @@ export const useNotificationStore = create<NotificationStore>((set) => ({
 }));
 
 export const notificationService = {
-  success: (message: string, title = 'Success', duration = 3000) => {
+  success: (message: string, title = 'Done', duration = 2800) => {
     void haptics.success();
     return useNotificationStore.getState().add({
       type: 'success',
@@ -71,7 +71,7 @@ export const notificationService = {
     });
   },
 
-  error: (message: string, title = 'Something went wrong', duration = 4000) => {
+  error: (message: string, title = "Couldn't finish that", duration = 5200) => {
     void haptics.error();
     return useNotificationStore.getState().add({
       type: 'error',
@@ -81,7 +81,7 @@ export const notificationService = {
     });
   },
 
-  warning: (message: string, title = 'Heads up', duration = 3000) => {
+  warning: (message: string, title = 'Heads up', duration = 3600) => {
     void haptics.warning();
     return useNotificationStore.getState().add({
       type: 'warning',

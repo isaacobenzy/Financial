@@ -1,7 +1,7 @@
 import type { ComponentProps } from 'react';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { TAB_BAR } from '@/constants/layout';
 import { theme } from '@/constants/theme';
 import { haptics } from '@/lib/haptics';
@@ -17,8 +17,8 @@ function TabIcon({
     <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
       <MaterialCommunityIcons
         name={name}
-        size={22}
-        color={focused ? theme.colors.white : theme.colors.tabInactive}
+        size={focused ? 22 : 21}
+        color={focused ? theme.colors.cedar : theme.colors.tabInactive}
       />
     </View>
   );
@@ -36,6 +36,7 @@ export default function TabLayout() {
         tabBarLabelStyle: styles.label,
         tabBarStyle: styles.tabBar,
         tabBarItemStyle: styles.tabItem,
+        tabBarHideOnKeyboard: true,
       }}
       screenListeners={{
         tabPress: () => {
@@ -84,31 +85,35 @@ const styles = StyleSheet.create({
     right: TAB_BAR.horizontalInset,
     bottom: TAB_BAR.bottomOffset,
     height: TAB_BAR.height,
-    borderRadius: 28,
+    borderRadius: Platform.OS === 'web' ? 22 : 26,
     backgroundColor: theme.colors.white,
     borderTopWidth: 0,
-    paddingTop: 8,
-    paddingBottom: 10,
+    borderWidth: 1,
+    borderColor: theme.colors.line,
+    paddingTop: Platform.OS === 'web' ? 6 : 8,
+    paddingBottom: Platform.OS === 'web' ? 8 : 10,
     ...theme.shadow.soft,
-    shadowOpacity: 0.14,
+    shadowOpacity: Platform.OS === 'web' ? 0.1 : 0.14,
+    shadowRadius: Platform.OS === 'web' ? 18 : 16,
     elevation: 10,
   },
   tabItem: {
-    paddingTop: 4,
+    paddingTop: 2,
   },
   label: {
     fontSize: 11,
     fontWeight: '700',
-    marginTop: 2,
+    letterSpacing: 0.2,
+    marginTop: 1,
   },
   iconWrap: {
-    width: 42,
-    height: 32,
-    borderRadius: 16,
+    width: 44,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconWrapActive: {
-    backgroundColor: theme.colors.cedar,
+    backgroundColor: theme.colors.sage,
   },
 });
