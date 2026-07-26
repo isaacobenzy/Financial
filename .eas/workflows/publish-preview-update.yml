@@ -1,19 +1,16 @@
-# Same idea as BetLive: publish an EAS Update so testers with a preview/dev
-# APK pick up JS changes without reinstalling or needing Metro.
-# Channel must match eas.json build.preview.channel ("preview").
+# Publishes an EAS Update for installed preview APKs (JS-only OTA).
+# Runs after merge to staging / on demand — not on every PR sync, so a flaky
+# Expo worker error does not block pull-request checks.
+#
+# Preview builds listen on eas.json channel "preview" (mapped to update branch
+# "preview"). Manual: pnpm update:preview
 
 name: Publish Preview Update
 
 on:
-  pull_request:
+  push:
     branches:
       - staging
-      - main
-    types:
-      - opened
-      - reopened
-      - synchronize
-      - ready_for_review
   workflow_dispatch: {}
 
 concurrency:
@@ -28,7 +25,8 @@ jobs:
   publish_preview_update:
     name: Publish preview update
     type: update
+    environment: preview
     params:
-      channel: preview
+      branch: preview
       platform: android
       message: Preview update for Financial Copilot testers
