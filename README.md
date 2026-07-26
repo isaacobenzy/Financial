@@ -202,7 +202,16 @@ npm run update:preview -- "Fix goals toast"
 ```
 
 When the build finishes: EAS dashboard → **Install** / QR → share that link.  
-After the APK is installed, `eas update --channel preview` ships new JS without rebuilding native (BetLive’s “preview update” pattern).
+After the APK is installed, publish an OTA so the app fetches new JS **without reinstalling**:
+
+```bash
+pnpm update:preview
+# or GitHub Actions → "EAS Update (OTA)" / push to staging
+```
+
+Installed preview builds listen on channel `preview` (`eas.json`). On launch (and when returning to the foreground), the app runs `checkAndApplyUpdates()` via `expo-updates` and reloads if a newer bundle is available.
+
+**OTA limits:** JS/asset changes only. Native modules (e.g. SMS reader, notification icon plugin) still need a new APK.
 
 EAS Workflows (repo): `.eas/workflows/android-preview-build.yml`, `publish-preview-update.yml`.
 

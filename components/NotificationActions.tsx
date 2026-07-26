@@ -10,11 +10,12 @@ import {
 import { startLiveActivityFeed } from '@/lib/liveActivityFeed';
 import { useNotificationSettingsStore } from '@/lib/notificationSettingsStore';
 import { scheduleStreakReminder } from '@/lib/notify';
+import { checkAndApplyUpdates } from '@/lib/otaUpdates';
 
 /**
  * Bootstrap push registration + deep-link listeners (BetLive pattern).
  * Foreground hygiene clears stale non-live OS alerts so home/login do not
- * feel like notifications "came back."
+ * feel like notifications "came back." Also checks EAS Update on boot/resume.
  */
 export default function NotificationActions() {
   const router = useRouter();
@@ -23,6 +24,8 @@ export default function NotificationActions() {
     let cleanup: (() => void) | undefined;
 
     (async () => {
+      // OTA first so testers land on the latest JS after install
+      void checkAndApplyUpdates();
       void warmPushStack();
       await useNotificationSettingsStore.getState().hydrate();
       await registerForPushNotifications();
@@ -30,17 +33,16 @@ export default function NotificationActions() {
         router.push(href as never);
       });
       startLiveActivityFeed();
-      // Schedule evening streak once at boot (idempotent via stable id + daily gate)
       void scheduleStreakReminder();
     })();
 
     const onAppState = (state: AppStateStatus) => {
       if (state === 'active') {
         void dismissNonLiveTrayAlerts();
+        void checkAndApplyUpdates();
       }
     };
     const sub = AppState.addEventListener('change', onAppState);
-    // Clear stale tray alerts on first mount too
     void dismissNonLiveTrayAlerts();
 
     return () => {

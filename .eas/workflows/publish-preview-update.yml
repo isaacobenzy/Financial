@@ -1,5 +1,6 @@
 # Same idea as BetLive: publish an EAS Update so testers with a preview/dev
-# APK can open a QR/link without needing your Metro server.
+# APK pick up JS changes without reinstalling or needing Metro.
+# Channel must match eas.json build.preview.channel ("preview").
 
 name: Publish Preview Update
 
@@ -28,6 +29,6 @@ jobs:
     name: Publish preview update
     type: update
     params:
-      branch: preview
+      channel: preview
       platform: android
       message: Preview update for Financial Copilot testers

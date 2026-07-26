@@ -19,6 +19,7 @@
     "build:android:dev": "npx eas-cli@latest build --platform android --profile development",
     "update:preview": "npx eas-cli@latest update --channel preview --message \"Preview update\"",
     "update:development": "npx eas-cli@latest update --channel development --message \"Development update\"",
+    "update:production": "npx eas-cli@latest update --channel production --message \"Production update\"",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "test": "jest --watchAll",
