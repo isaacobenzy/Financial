@@ -1,17 +1,16 @@
 name: EAS Web Hosting
 
-# Deploys the Expo web export to EAS Hosting (shareable https://….expo.app URL).
+# Export web + deploy to EAS Hosting (same EXPO_TOKEN pattern as Android APK builds).
+# Shareable URL:
+#   staging / preview → https://<subdomain>--preview.expo.app/
+#   main / production → https://<subdomain>.expo.app/
 # Docs: https://docs.expo.dev/eas/hosting/get-started/
-#
-# - push to staging → stable preview alias
-# - push to main → production alias (--prod)
-# - PRs: skip when EXPO_TOKEN is unavailable (do not fail the PR check)
 
 on:
   workflow_dispatch:
     inputs:
       environment:
-        description: preview or production
+        description: preview or production (EAS Hosting alias)
         required: true
         default: preview
         type: choice
@@ -22,66 +21,39 @@ on:
     branches:
       - main
       - staging
-  pull_request:
-    branches:
-      - staging
-      - main
 
 concurrency:
   group: eas-web-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  build_and_deploy:
     name: Export web & eas deploy
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Check for EXPO_TOKEN
-        id: expo
-        run: |
-          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
-            echo "has_token=false" >> "$GITHUB_OUTPUT"
-            echo "EXPO_TOKEN is not available in this run."
-            if [ "${{ github.event_name }}" = "pull_request" ]; then
-              echo "Skipping web deploy on PR (secret not exposed or not configured)."
-            else
-              echo "::error::Missing EXPO_TOKEN repository secret for deploy on ${{ github.ref_name }}."
-              echo "Create one at https://expo.dev/settings/access-tokens"
-              exit 1
-            fi
-          else
-            echo "has_token=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Checkout
-        if: steps.expo.outputs.has_token == 'true'
         uses: actions/checkout@v5
 
       - name: Setup pnpm
-        if: steps.expo.outputs.has_token == 'true'
         uses: pnpm/action-setup@v4
 
       - name: Setup Node
-        if: steps.expo.outputs.has_token == 'true'
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: pnpm
 
       - name: Setup Expo and EAS
-        if: steps.expo.outputs.has_token == 'true'
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Install dependencies
-        if: steps.expo.outputs.has_token == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Ensure EAS project is linked
-        if: steps.expo.outputs.has_token == 'true'
         run: |
           if ! node -e "const a=require('./app.json'); if(!a.expo?.extra?.eas?.projectId) process.exit(1)"; then
             echo "EAS project not linked. On your machine run:"
@@ -92,11 +64,17 @@ jobs:
           fi
 
       - name: Export web
-        if: steps.expo.outputs.has_token == 'true'
         run: pnpm run export:web
 
+      - name: Upload web build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist-${{ github.sha }}
+          path: dist
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Deploy to EAS Hosting
-        if: steps.expo.outputs.has_token == 'true'
         run: |
           ENV="${{ github.event.inputs.environment }}"
           if [ -z "$ENV" ]; then

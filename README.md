@@ -219,8 +219,10 @@ EAS Workflows (repo): `.eas/workflows/android-preview-build.yml`, `publish-previ
 
 Anyone can open the app in a browser (no APK). SMS inbox / OS push / biometrics still need the Android build.
 
+Uses the same `EXPO_TOKEN` GitHub Actions secret as Android EAS builds (already linked via `app.json` `extra.eas.projectId`).
+
 ```bash
-# Stable shareable preview (recommended for teammates / demos)
+# Stable shareable preview
 pnpm deploy:web:preview
 # → https://<your-subdomain>--preview.expo.app/
 
@@ -229,9 +231,7 @@ pnpm deploy:web:prod
 # → https://<your-subdomain>.expo.app/
 ```
 
-First deploy prompts you to pick a **preview subdomain** (globally unique). After that, each `deploy:web:preview` updates the same shareable link.
-
-GitHub Actions: **EAS Web Hosting** deploys `preview` on `staging` / PRs and `production` on `main` (needs `EXPO_TOKEN` secret).
+CI (**EAS Web Hosting**): on push to `staging` / `main` (and workflow_dispatch) exports the web build, uploads a `web-dist-…` artifact, and deploys with `EXPO_TOKEN` — same pattern as the Android APK workflow.
 
 Demo login on web: `demo@financialcopilot.com` / `demo123`.
 
