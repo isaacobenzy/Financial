@@ -1,17 +1,19 @@
 name: EAS Web Hosting
 
-# Deploys the Expo web export to EAS Hosting (shareable https://….expo.app URL).
-# Docs: https://docs.expo.dev/eas/hosting/get-started/
+# Always exports a web build (artifact), like the Android APK build job.
+# Deploys to EAS Hosting only when EXPO_TOKEN is configured — never fails CI
+# just because the secret is missing (project is already linked in app.json).
 #
-# - push to staging → stable preview alias
-# - push to main → production alias (--prod)
-# - PRs: skip when EXPO_TOKEN is unavailable (do not fail the PR check)
+# Shareable live URL (when token is set):
+#   preview → https://<subdomain>--preview.expo.app/
+#   prod    → https://<subdomain>.expo.app/
+# Docs: https://docs.expo.dev/eas/hosting/get-started/
 
 on:
   workflow_dispatch:
     inputs:
       environment:
-        description: preview or production
+        description: preview or production (EAS Hosting alias)
         required: true
         default: preview
         type: choice
@@ -32,8 +34,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    name: Export web & eas deploy
+  build_web:
+    name: Export web build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Export web
+        run: pnpm run export:web
+
+      - name: Upload web build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist-${{ github.sha }}
+          path: dist
+          if-no-files-found: error
+          retention-days: 14
+
+  deploy_hosting:
+    name: Deploy EAS Hosting
+    needs: build_web
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -42,14 +76,9 @@ jobs:
         run: |
           if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
             echo "has_token=false" >> "$GITHUB_OUTPUT"
-            echo "EXPO_TOKEN is not available in this run."
-            if [ "${{ github.event_name }}" = "pull_request" ]; then
-              echo "Skipping web deploy on PR (secret not exposed or not configured)."
-            else
-              echo "::error::Missing EXPO_TOKEN repository secret for deploy on ${{ github.ref_name }}."
-              echo "Create one at https://expo.dev/settings/access-tokens"
-              exit 1
-            fi
+            echo "::notice::EXPO_TOKEN not set — web build artifact is ready; skipping EAS Hosting deploy."
+            echo "Add a GitHub Actions secret named EXPO_TOKEN (https://expo.dev/settings/access-tokens)"
+            echo "to publish the shareable https://….expo.app link. Or run locally: pnpm deploy:web:preview"
           else
             echo "has_token=true" >> "$GITHUB_OUTPUT"
           fi
@@ -80,24 +109,20 @@ jobs:
         if: steps.expo.outputs.has_token == 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Ensure EAS project is linked
+      - name: Download web build artifact
         if: steps.expo.outputs.has_token == 'true'
-        run: |
-          if ! node -e "const a=require('./app.json'); if(!a.expo?.extra?.eas?.projectId) process.exit(1)"; then
-            echo "EAS project not linked. On your machine run:"
-            echo "  npx eas-cli@latest login"
-            echo "  npx eas-cli@latest init"
-            echo "Commit the projectId written into app.json, then re-run this workflow."
-            exit 1
-          fi
-
-      - name: Export web
-        if: steps.expo.outputs.has_token == 'true'
-        run: pnpm run export:web
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist-${{ github.sha }}
+          path: dist
 
       - name: Deploy to EAS Hosting
         if: steps.expo.outputs.has_token == 'true'
         run: |
+          if ! node -e "const a=require('./app.json'); if(!a.expo?.extra?.eas?.projectId) process.exit(1)"; then
+            echo "::error::EAS projectId missing from app.json"
+            exit 1
+          fi
           ENV="${{ github.event.inputs.environment }}"
           if [ -z "$ENV" ]; then
             if [ "${{ github.ref }}" = "refs/heads/main" ]; then
