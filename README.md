@@ -132,6 +132,10 @@ Restart Expo after changing `.env` (`npm start -- --clear`).
 
 **Never commit** `.env` or real API keys.
 
+Local `expo start` / `expo run:android` / `expo run:ios` inline `EXPO_PUBLIC_*` the same way your working mobile build does. `app.config.js` also copies the key into `extra` so Expo Router / EAS bundles can resolve it via `Constants.expoConfig.extra` if needed.
+
+For **EAS Build**, **EAS Update**, and **EAS Hosting** (web preview), set the same `EXPO_PUBLIC_OPENROUTER_API_KEY` on the Expo project environment (`development` / `preview` / `production`) in the [Expo dashboard](https://expo.dev) so cloud builds match your local key. Without that, AI chat works locally but fails in shared APKs / preview URLs.
+
 ### Run
 
 ```bash

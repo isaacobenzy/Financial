@@ -1,7 +1,8 @@
 import type { ComponentProps } from 'react';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { Platform, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { TAB_BAR } from '@/constants/layout';
 import { theme } from '@/constants/theme';
 import { haptics } from '@/lib/haptics';
 
@@ -79,10 +80,10 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: Platform.OS === 'ios' ? 24 : 16,
-    height: 72,
+    left: TAB_BAR.horizontalInset,
+    right: TAB_BAR.horizontalInset,
+    bottom: TAB_BAR.bottomOffset,
+    height: TAB_BAR.height,
     borderRadius: 28,
     backgroundColor: theme.colors.white,
     borderTopWidth: 0,
