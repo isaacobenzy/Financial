@@ -1,14 +1,13 @@
-name: EAS Update (OTA)
+name: EAS Update OTA (optional)
 
-# Publishes a JS-only update so installed preview/production APKs pick up
-# changes without reinstalling. Requires matching runtimeVersion + channel.
-# Docs: https://docs.expo.dev/eas-update/introduction/
+# Optional GitHub Actions OTA publish (needs secrets.EXPO_TOKEN).
+# Primary path: .eas/workflows/publish-preview-update.yml (EAS Workflows).
 
 on:
   workflow_dispatch:
     inputs:
       channel:
-        description: Update channel (must match the installed build profile)
+        description: Update channel
         required: true
         default: preview
         type: choice
@@ -20,9 +19,6 @@ on:
         description: Update message
         required: false
         default: OTA update
-  push:
-    branches:
-      - staging
 
 concurrency:
   group: eas-update-${{ github.ref }}
@@ -34,12 +30,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Check for EXPO_TOKEN
+      - name: Require EXPO_TOKEN for GitHub Actions path
         id: expo
         run: |
           if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
             echo "has_token=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Missing EXPO_TOKEN — skipping OTA publish."
+            echo "::notice::No GitHub Actions secret EXPO_TOKEN — skipping."
+            echo "OTA updates are published by EAS Workflows (publish-preview-update.yml)."
           else
             echo "has_token=true" >> "$GITHUB_OUTPUT"
           fi
@@ -75,10 +72,6 @@ jobs:
         run: |
           CHANNEL="${{ github.event.inputs.channel }}"
           MESSAGE="${{ github.event.inputs.message }}"
-          if [ -z "$CHANNEL" ]; then
-            CHANNEL=preview
-          fi
-          if [ -z "$MESSAGE" ]; then
-            MESSAGE="OTA ${CHANNEL} $(git rev-parse --short HEAD)"
-          fi
+          if [ -z "$CHANNEL" ]; then CHANNEL=preview; fi
+          if [ -z "$MESSAGE" ]; then MESSAGE="OTA ${CHANNEL} $(git rev-parse --short HEAD)"; fi
           eas update --channel "$CHANNEL" --message "$MESSAGE" --non-interactive --platform android
