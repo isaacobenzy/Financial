@@ -1,4 +1,11 @@
-name: EAS Build
+name: EAS Build (optional)
+
+# Optional GitHub Actions trigger for Android APK builds.
+# Primary path: .eas/workflows/android-preview-build.yml / build.yml
+# (EAS Workflows run as the linked Expo project — no GitHub EXPO_TOKEN).
+#
+# This workflow only runs on manual dispatch and needs
+# repo secret EXPO_TOKEN if you choose to use it.
 
 on:
   workflow_dispatch:
@@ -12,9 +19,6 @@ on:
           - development
           - preview
           - production
-  push:
-    branches:
-      - main
 
 concurrency:
   group: eas-build-${{ github.ref }}
@@ -26,49 +30,54 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Check for EXPO_TOKEN
+      - name: Require EXPO_TOKEN for GitHub Actions path
+        id: expo
         run: |
           if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
-            echo "Missing EXPO_TOKEN repository secret."
-            echo "Create one at https://expo.dev/settings/access-tokens"
-            echo "then add it under GitHub → Settings → Secrets and variables → Actions."
-            exit 1
+            echo "has_token=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No GitHub Actions secret EXPO_TOKEN — skipping."
+            echo "Android APKs are built by EAS Workflows (.eas/workflows/) without this secret."
+            echo "To use this optional Actions path, add EXPO_TOKEN under Repo → Settings → Secrets → Actions."
+          else
+            echo "has_token=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Checkout
+        if: steps.expo.outputs.has_token == 'true'
         uses: actions/checkout@v5
 
       - name: Setup pnpm
+        if: steps.expo.outputs.has_token == 'true'
         uses: pnpm/action-setup@v4
 
       - name: Setup Node
+        if: steps.expo.outputs.has_token == 'true'
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: pnpm
 
       - name: Setup Expo and EAS
+        if: steps.expo.outputs.has_token == 'true'
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Install dependencies
+        if: steps.expo.outputs.has_token == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Ensure EAS project is linked
+        if: steps.expo.outputs.has_token == 'true'
         run: |
           if ! node -e "const a=require('./app.json'); if(!a.expo?.extra?.eas?.projectId) process.exit(1)"; then
-            echo "EAS project not linked. On your machine run:"
-            echo "  npx eas-cli@latest login"
-            echo "  npx eas-cli@latest init"
-            echo "Commit the projectId written into app.json, then re-run this workflow."
+            echo "EAS project not linked in app.json"
             exit 1
           fi
 
-      # Android only — no Apple Developer account required.
-      # See: https://docs.expo.dev/tutorial/eas/internal-distribution-builds/
       - name: Build Android on EAS
+        if: steps.expo.outputs.has_token == 'true'
         env:
           EAS_BUILD_NO_EXPO_GO_WARNING: 'true'
         run: >

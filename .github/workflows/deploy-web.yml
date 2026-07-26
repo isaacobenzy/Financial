@@ -1,18 +1,13 @@
-name: Deploy Web
+name: Deploy Web (optional)
 
-# Optional GitHub Actions path for EAS Hosting (uses secrets.EXPO_TOKEN).
-# Prefer EAS Workflows (.eas/workflows/deploy-web-*.yml) when the Expo GitHub
-# integration is linked — those run as the project and do not need this secret.
+# Optional GitHub Actions path for EAS Hosting (needs secrets.EXPO_TOKEN).
 #
-# Flow:
-#   1. Push / workflow_dispatch
-#   2. Checkout
-#   3. Authenticate EAS CLI via expo/expo-github-action + secrets.EXPO_TOKEN
-#   4. pnpm export:web → static site in dist/
-#   5. eas deploy --non-interactive → preview URL (or --prod on main)
+# Primary path — no GitHub secret:
+#   .eas/workflows/deploy-web-preview.yml  → type: deploy, prod: false
+#   .eas/workflows/deploy-web-production.yml → type: deploy, prod: true
 #
-# Shareable URL is from eas deploy (Hosting), not from publish-preview-update.yml
-# (that file is EAS Update / OTA for installed APKs only).
+# Those EAS Workflows run as the linked Expo project and emit the shareable
+# https://….expo.app preview URL. This Actions workflow is manual-only.
 
 on:
   workflow_dispatch:
@@ -25,10 +20,6 @@ on:
         options:
           - preview
           - production
-  push:
-    branches:
-      - main
-      - staging
 
 concurrency:
   group: deploy-web-${{ github.ref }}
@@ -40,41 +31,57 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Require EXPO_TOKEN for GitHub Actions path
+        id: expo
+        run: |
+          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+            echo "has_token=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No GitHub Actions secret EXPO_TOKEN — skipping."
+            echo "Web preview URLs come from EAS Workflows (deploy-web-preview.yml), not this job."
+          else
+            echo "has_token=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout
+        if: steps.expo.outputs.has_token == 'true'
         uses: actions/checkout@v5
 
       - name: Setup pnpm
+        if: steps.expo.outputs.has_token == 'true'
         uses: pnpm/action-setup@v4
 
       - name: Setup Node
+        if: steps.expo.outputs.has_token == 'true'
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: pnpm
 
       - name: Setup EAS
+        if: steps.expo.outputs.has_token == 'true'
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Install dependencies
+        if: steps.expo.outputs.has_token == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Ensure EAS project is linked
+        if: steps.expo.outputs.has_token == 'true'
         run: |
           if ! node -e "const a=require('./app.json'); if(!a.expo?.extra?.eas?.projectId) process.exit(1)"; then
-            echo "EAS project not linked. On your machine run:"
-            echo "  npx eas-cli@latest login"
-            echo "  npx eas-cli@latest init"
-            echo "Commit the projectId written into app.json, then re-run this workflow."
+            echo "EAS project not linked in app.json"
             exit 1
           fi
 
       - name: Export web
+        if: steps.expo.outputs.has_token == 'true'
         run: pnpm run export:web
 
       - name: Upload web build artifact
+        if: steps.expo.outputs.has_token == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: web-dist-${{ github.sha }}
@@ -83,19 +90,15 @@ jobs:
           retention-days: 14
 
       - name: Deploy to EAS Hosting
+        if: steps.expo.outputs.has_token == 'true'
         run: |
           ENV="${{ github.event.inputs.environment }}"
           if [ -z "$ENV" ]; then
-            if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-              ENV=production
-            else
-              ENV=preview
-            fi
+            ENV=preview
           fi
           echo "Deploying as: $ENV"
           if [ "$ENV" = "production" ]; then
             eas deploy --non-interactive --prod
           else
-            # Preview hosting (not --prod) + stable alias for sharing
             eas deploy --non-interactive --alias preview
           fi

@@ -1,5 +1,6 @@
 # BetLive-style: shareable Android APK for testers (no Apple account).
 # Install link appears on the EAS build page when finished.
+# Runs as the linked Expo project — no GitHub EXPO_TOKEN required.
 
 name: Android Preview Build
 
@@ -8,6 +9,7 @@ on:
   push:
     branches:
       - main
+      - staging
 
 concurrency:
   cancel_in_progress: true
