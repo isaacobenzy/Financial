@@ -1,0 +1,84 @@
+name: EAS Update (OTA)
+
+# Publishes a JS-only update so installed preview/production APKs pick up
+# changes without reinstalling. Requires matching runtimeVersion + channel.
+# Docs: https://docs.expo.dev/eas-update/introduction/
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Update channel (must match the installed build profile)
+        required: true
+        default: preview
+        type: choice
+        options:
+          - preview
+          - production
+          - development
+      message:
+        description: Update message
+        required: false
+        default: OTA update
+  push:
+    branches:
+      - staging
+
+concurrency:
+  group: eas-update-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  update:
+    name: Publish EAS Update
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check for EXPO_TOKEN
+        id: expo
+        run: |
+          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+            echo "has_token=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Missing EXPO_TOKEN — skipping OTA publish."
+          else
+            echo "has_token=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.expo.outputs.has_token == 'true'
+        uses: actions/checkout@v5
+
+      - name: Setup pnpm
+        if: steps.expo.outputs.has_token == 'true'
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        if: steps.expo.outputs.has_token == 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Setup Expo and EAS
+        if: steps.expo.outputs.has_token == 'true'
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        if: steps.expo.outputs.has_token == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Publish update
+        if: steps.expo.outputs.has_token == 'true'
+        run: |
+          CHANNEL="${{ github.event.inputs.channel }}"
+          MESSAGE="${{ github.event.inputs.message }}"
+          if [ -z "$CHANNEL" ]; then
+            CHANNEL=preview
+          fi
+          if [ -z "$MESSAGE" ]; then
+            MESSAGE="OTA ${CHANNEL} $(git rev-parse --short HEAD)"
+          fi
+          eas update --channel "$CHANNEL" --message "$MESSAGE" --non-interactive --platform android
