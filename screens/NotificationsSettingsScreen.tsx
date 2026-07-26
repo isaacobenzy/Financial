@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Switch,
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
@@ -20,26 +19,76 @@ import {
   sendActivityPush,
 } from '@/lib/pushNotifications';
 import { notificationService } from '@/lib/notificationStore';
-import { isExpoGo } from '@/lib/runtime';
+import { isExpoGo, supportsSystemNotifications } from '@/lib/runtime';
 import { haptics } from '@/lib/haptics';
+import {
+  getLiveSectionPrefs,
+  publishLiveSections,
+  setLiveSectionPref,
+  type LiveSection,
+  type LiveSectionPrefs,
+} from '@/lib/liveActivity';
+import {
+  SettingsSection,
+  SettingsToggleRow,
+} from '@/components/settings/SettingsChrome';
+
+const LIVE_ROWS: Array<{
+  key: LiveSection;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  label: string;
+  desc: string;
+}> = [
+  {
+    key: 'overview',
+    icon: 'view-dashboard-outline',
+    label: 'Overview live',
+    desc: 'Balance · goal · streak summary',
+  },
+  {
+    key: 'balance',
+    icon: 'wallet-outline',
+    label: 'Balance widget',
+    desc: 'Lock-screen balance strip',
+  },
+  {
+    key: 'goals',
+    icon: 'bullseye-arrow',
+    label: 'Goals widget',
+    desc: 'Top goal progress on lock screen',
+  },
+  {
+    key: 'streak',
+    icon: 'fire',
+    label: 'Streak widget',
+    desc: 'Daily money streak status',
+  },
+];
 
 export default function NotificationsSettingsScreen() {
   const router = useRouter();
   const store = useNotificationSettingsStore();
   const [token, setToken] = useState<string | null>(getCachedExpoPushToken());
   const [busy, setBusy] = useState(false);
+  const [livePrefs, setLivePrefs] = useState<LiveSectionPrefs>({
+    overview: true,
+    balance: true,
+    goals: true,
+    streak: true,
+  });
   const expoGo = isExpoGo();
+  const pushSupported = supportsSystemNotifications();
 
   useFocusEffect(
     useCallback(() => {
       void store.hydrate();
       setToken(getCachedExpoPushToken());
+      void getLiveSectionPrefs().then(setLivePrefs);
     }, [store]),
   );
 
   const handlePushToggle = async (enabled: boolean) => {
     store.setPushEnabled(enabled);
-    await haptics.select();
     if (enabled) {
       setBusy(true);
       try {
@@ -52,12 +101,23 @@ export default function NotificationsSettingsScreen() {
             'Expo Go limit',
           );
         } else {
-          notificationService.warning('Enable notifications in system settings');
+          notificationService.warning('Enable notifications in device settings');
         }
       } finally {
         setBusy(false);
       }
     }
+  };
+
+  const toggleLive = async (section: LiveSection, value: boolean) => {
+    if (!pushSupported) {
+      notificationService.info('Live lock-screen widgets need a development build');
+      return;
+    }
+    const next = await setLiveSectionPref(section, value);
+    setLivePrefs(next);
+    if (value) await publishLiveSections();
+    notificationService.info(value ? `${section} widget on` : `${section} widget off`);
   };
 
   const sendTest = async () => {
@@ -71,9 +131,9 @@ export default function NotificationsSettingsScreen() {
         title: 'Financial Copilot',
         body: 'Test alert — feel (haptic), see (toast), hear (OS sound).',
         category: 'general',
-        data: { href: '/(tabs)/settings' },
+        data: { href: '/notifications-settings' },
       });
-      notificationService.info('Test sent (remote → local → toast fallback)');
+      notificationService.info('Test sent');
     } finally {
       setBusy(false);
     }
@@ -85,130 +145,133 @@ export default function NotificationsSettingsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.back}>
           <MaterialCommunityIcons name="arrow-left" size={24} color={theme.colors.ink} />
         </TouchableOpacity>
-        <Text style={styles.title}>Notifications</Text>
+        <Text style={styles.title}>Feedback & alerts</Text>
         <View style={styles.back} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.subtitle}>
-          Feel (haptics), see (toasts), and hear (OS push). Categories gate every push before send.
+          Feel haptics, see in-app toasts, and hear OS push. Toggle what stays live on your lock
+          screen.
         </Text>
 
         {expoGo ? (
           <View style={styles.banner}>
             <Text style={styles.bannerText}>
-              Expo Go on Android (SDK 53+) cannot use remote push. Install a development / preview
-              build for real lock-screen alerts. Toasts + haptics still work here.
+              Expo Go on Android cannot use remote push (SDK 53+). Toasts and haptics still work —
+              use a preview APK for lock-screen alerts.
             </Text>
           </View>
         ) : null}
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Master</Text>
-          <Row
+        <SettingsSection title="Master">
+          <SettingsToggleRow
+            icon="bell-outline"
             label="Enable push notifications"
+            description="Master switch for all OS alerts"
             value={store.pushEnabled}
             onValueChange={handlePushToggle}
           />
-          <Row
+          <SettingsToggleRow
+            icon="vibrate"
             label="Haptic feedback"
-            description="Login, tabs, AI reply, goals, and toast pairing"
+            description="Paired with toasts and key actions"
             value={store.hapticsEnabled}
             onValueChange={store.setHapticsEnabledSetting}
+            last
           />
-        </View>
+        </SettingsSection>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Categories</Text>
-          <Row
+        <SettingsSection title="Alert categories">
+          <SettingsToggleRow
             label="Live ledger"
             description="Balance / lock-screen live updates"
             value={store.ledgerLive}
             onValueChange={store.setLedgerLive}
           />
-          <Row
+          <SettingsToggleRow
             label="Goals & milestones"
             description="Created, updated, almost done, completed"
             value={store.goalAlerts}
             onValueChange={store.setGoalAlerts}
           />
-          <Row
+          <SettingsToggleRow
             label="Streak reminders"
             description="Daily check-in and risk alerts"
             value={store.streakAlerts}
             onValueChange={store.setStreakAlerts}
           />
-          <Row
+          <SettingsToggleRow
             label="Import digests"
             description="SMS / paste import summaries"
             value={store.importAlerts}
             onValueChange={store.setImportAlerts}
           />
-          <Row
+          <SettingsToggleRow
             label="Insights & nudges"
             description="Spend anomalies and tips"
             value={store.insightAlerts}
             onValueChange={store.setInsightAlerts}
           />
-          <Row
+          <SettingsToggleRow
             label="Security"
             description="Sign-in and session events"
             value={store.securityAlerts}
             onValueChange={store.setSecurityAlerts}
+            last
           />
+        </SettingsSection>
+
+        <SettingsSection title="Live lock-screen widgets">
+          {LIVE_ROWS.map((row, i) => (
+            <SettingsToggleRow
+              key={row.key}
+              icon={row.icon}
+              label={row.label}
+              description={row.desc}
+              value={livePrefs[row.key]}
+              onValueChange={(v) => toggleLive(row.key, v)}
+              last={i === LIVE_ROWS.length - 1}
+            />
+          ))}
+        </SettingsSection>
+
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={styles.secondary}
+            onPress={async () => {
+              await haptics.buttonPress();
+              await publishLiveSections();
+              notificationService.success('Live widgets refreshed');
+            }}
+          >
+            <Text style={styles.secondaryText}>Refresh live widgets</Text>
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Device token</Text>
-          <Text style={styles.token} selectable>
-            {token || 'Not registered'}
-          </Text>
-          <TouchableOpacity style={styles.primary} onPress={sendTest} disabled={busy}>
-            {busy ? (
-              <ActivityIndicator color={theme.colors.white} />
-            ) : (
-              <Text style={styles.primaryText}>Send test notification</Text>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.link}
-            onPress={() => Linking.openURL('https://expo.dev/notifications')}
-          >
-            <Text style={styles.linkText}>Open Expo push tool</Text>
-          </TouchableOpacity>
-        </View>
+        <SettingsSection title="Test on this device">
+          <View style={styles.tokenBox}>
+            <Text style={styles.tokenLabel}>Expo push token</Text>
+            <Text style={styles.token} selectable>
+              {token || 'Not registered yet'}
+            </Text>
+            <TouchableOpacity style={styles.primary} onPress={sendTest} disabled={busy}>
+              {busy ? (
+                <ActivityIndicator color={theme.colors.white} />
+              ) : (
+                <Text style={styles.primaryText}>Send test notification</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.link}
+              onPress={() => Linking.openURL('https://expo.dev/notifications')}
+            >
+              <Text style={styles.linkText}>Open Expo push tool</Text>
+            </TouchableOpacity>
+          </View>
+        </SettingsSection>
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-function Row({
-  label,
-  description,
-  value,
-  onValueChange,
-}: {
-  label: string;
-  description?: string;
-  value: boolean;
-  onValueChange: (v: boolean) => void;
-}) {
-  return (
-    <View style={styles.row}>
-      <View style={styles.rowCopy}>
-        <Text style={styles.rowLabel}>{label}</Text>
-        {description ? <Text style={styles.rowDesc}>{description}</Text> : null}
-      </View>
-      <Switch
-        value={value}
-        onValueChange={async (v) => {
-          await haptics.select();
-          onValueChange(v);
-        }}
-        trackColor={{ false: theme.colors.line, true: theme.colors.mint }}
-        thumbColor={theme.colors.white}
-      />
-    </View>
   );
 }
 
@@ -225,44 +288,42 @@ const styles = StyleSheet.create({
   },
   back: { width: 40 },
   title: { fontSize: 18, fontWeight: '700', color: theme.colors.ink },
-  content: { padding: 16, paddingBottom: 40, gap: 14 },
-  subtitle: { fontSize: 13, color: theme.colors.muted, lineHeight: 19 },
+  content: { paddingBottom: 48 },
+  subtitle: {
+    fontSize: 13,
+    color: theme.colors.muted,
+    lineHeight: 19,
+    marginTop: 16,
+    marginHorizontal: 20,
+  },
   banner: {
+    marginTop: 12,
+    marginHorizontal: 16,
     backgroundColor: theme.colors.brassSoft,
     borderRadius: theme.radius.md,
     padding: 12,
   },
-  bannerText: { fontSize: 12, color: theme.colors.cedarDeep, lineHeight: 18, fontWeight: '600' },
-  section: {
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.radius.lg,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: theme.colors.line,
+  bannerText: {
+    fontSize: 12,
+    color: theme.colors.cedarDeep,
+    lineHeight: 18,
+    fontWeight: '600',
   },
-  sectionTitle: {
-    fontSize: 13,
+  actions: { marginHorizontal: 16, marginTop: 10 },
+  secondary: { paddingVertical: 12, alignItems: 'center' },
+  secondaryText: { color: theme.colors.brass, fontWeight: '700' },
+  tokenBox: { padding: 14 },
+  tokenLabel: {
+    fontSize: 12,
     fontWeight: '700',
     color: theme.colors.muted,
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    marginBottom: 6,
   },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.line,
-  },
-  rowCopy: { flex: 1, paddingRight: 12 },
-  rowLabel: { fontSize: 15, fontWeight: '600', color: theme.colors.ink },
-  rowDesc: { fontSize: 12, color: theme.colors.muted, marginTop: 2 },
   token: {
     fontSize: 11,
     color: theme.colors.ink,
     fontFamily: 'SpaceMono',
-    marginBottom: 12,
+    marginBottom: 14,
     lineHeight: 16,
   },
   primary: {

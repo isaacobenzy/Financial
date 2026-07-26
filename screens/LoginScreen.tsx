@@ -12,7 +12,6 @@ import { authenticateAccount, registerAccount } from '@/lib/accounts';
 import { haptics } from '@/lib/haptics';
 import { notificationService } from '@/lib/notificationStore';
 import { notifyAuthEvent } from '@/lib/liveActivity';
-import { emitActivityPulse } from '@/lib/liveActivityFeed';
 import {
   authenticateBiometric,
   getBiometricLabel,
@@ -53,13 +52,8 @@ export default function LoginScreen() {
 
   const enterApp = async (displayName?: string) => {
     await markAppUnlocked();
-    await notifyAuthEvent('login', displayName);
-    void emitActivityPulse({
-      kind: 'ledger',
-      title: 'Signed in',
-      body: 'Live ledger widgets are ready.',
-      href: '/(tabs)',
-    });
+    // Single auth alert — avoid a second delayed “Signed in” pulse
+    void notifyAuthEvent('login', displayName);
     router.replace('/(tabs)');
   };
 

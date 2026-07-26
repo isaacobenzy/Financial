@@ -216,17 +216,18 @@ export async function notifyAuthEvent(
 ): Promise<void> {
   const { notifyUser } = await import('@/lib/notify');
   if (kind === 'login') {
-    await notifyUser(
+    // Toast + shade first; sticky widgets refresh in the background
+    void notifyUser(
       'Signed in',
       name ? `Welcome back, ${name}.` : 'Welcome back to Financial Copilot.',
       'login',
       { data: { screen: 'home' } },
     );
     if (supportsSystemNotifications()) {
-      await publishLiveSections();
+      void publishLiveSections();
     }
   } else {
-    await clearLiveActivity();
-    await notifyUser('Signed out', 'Session ended. Live widgets cleared.', 'logout');
+    void clearLiveActivity();
+    void notifyUser('Signed out', 'Session ended. Live widgets cleared.', 'logout');
   }
 }

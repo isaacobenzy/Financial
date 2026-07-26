@@ -4,6 +4,7 @@
  */
 
 import { notificationService } from '@/lib/notificationStore';
+import { sendActivityPush } from '@/lib/pushNotifications';
 import type { PushCategory } from '@/lib/notificationSettingsStore';
 
 export type NotifyKind =
@@ -52,33 +53,28 @@ export async function notifyUser(
     }
   }
 
-  // Push in background — never delay the in-app toast
-  void import('@/lib/pushNotifications')
-    .then(({ sendActivityPush }) =>
-      sendActivityPush({
-        title,
-        body,
-        category: categoryFor(kind),
-        skipToastFallback: true,
-        data: {
-          ...options?.data,
-          href:
-            options?.data?.screen === 'goals'
-              ? '/(tabs)/goals'
-              : options?.data?.screen === 'assistant'
-                ? '/assistant'
-                : options?.data?.screen === 'transactions'
-                  ? '/transactions'
-                  : '/(tabs)',
-        },
-      }),
-    )
-    .catch(() => undefined);
+  // Local OS push — never delay the in-app toast
+  void sendActivityPush({
+    title,
+    body,
+    category: categoryFor(kind),
+    skipToastFallback: true,
+    data: {
+      ...options?.data,
+      href:
+        options?.data?.screen === 'goals'
+          ? '/(tabs)/goals'
+          : options?.data?.screen === 'assistant'
+            ? '/assistant'
+            : options?.data?.screen === 'transactions'
+              ? '/transactions'
+              : '/(tabs)',
+    },
+  });
 }
 
 export async function scheduleStreakReminder(): Promise<void> {
   try {
-    const { sendActivityPush } = await import('@/lib/pushNotifications');
     await sendActivityPush({
       title: 'Streak at risk',
       body: 'Open Financial Copilot tonight to keep your money streak alive.',

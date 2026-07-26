@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import {
   registerForPushNotifications,
   setupNotificationResponseListeners,
+  warmPushStack,
 } from '@/lib/pushNotifications';
 import { startLiveActivityFeed } from '@/lib/liveActivityFeed';
 import { useNotificationSettingsStore } from '@/lib/notificationSettingsStore';
@@ -17,6 +18,8 @@ export default function NotificationActions() {
     let cleanup: (() => void) | undefined;
 
     (async () => {
+      // Warm native module + channels first so the first alert is instant
+      void warmPushStack();
       await useNotificationSettingsStore.getState().hydrate();
       await registerForPushNotifications();
       cleanup = await setupNotificationResponseListeners((href) => {

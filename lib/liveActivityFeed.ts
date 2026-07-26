@@ -4,6 +4,7 @@
  */
 
 import { useLiveActivityStore } from '@/lib/liveActivityStore';
+import { sendActivityPush } from '@/lib/pushNotifications';
 import type { PushCategory } from '@/lib/notificationSettingsStore';
 
 const DEMO_FLAG = process.env.EXPO_PUBLIC_DEMO_LIVE_FEED === '1';
@@ -36,29 +37,25 @@ export async function emitActivityPulse(params: {
             ? 'insight_alerts'
             : 'ledger_live';
 
-  // Fire-and-forget push so UI stays responsive
-  void import('@/lib/pushNotifications')
-    .then(({ sendActivityPush }) =>
-      sendActivityPush({
-        title: params.title,
-        body: params.body,
-        category,
-        skipToastFallback: true,
-        data: {
-          href:
-            params.href ||
-            (params.kind === 'goal'
-              ? '/(tabs)/goals'
-              : params.kind === 'import'
-                ? '/import-sms'
-                : '/(tabs)'),
-          goalId: params.goalId,
-          screen:
-            params.kind === 'goal' ? 'goals' : params.kind === 'import' ? 'import' : 'home',
-        },
-      }),
-    )
-    .catch(() => undefined);
+  // Fire-and-forget local push so UI stays responsive
+  void sendActivityPush({
+    title: params.title,
+    body: params.body,
+    category,
+    skipToastFallback: true,
+    data: {
+      href:
+        params.href ||
+        (params.kind === 'goal'
+          ? '/(tabs)/goals'
+          : params.kind === 'import'
+            ? '/import-sms'
+            : '/(tabs)'),
+      goalId: params.goalId,
+      screen:
+        params.kind === 'goal' ? 'goals' : params.kind === 'import' ? 'import' : 'home',
+    },
+  });
 }
 
 export async function publishLedgerLiveFromSnapshot() {

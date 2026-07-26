@@ -23,6 +23,10 @@
         "NSUserNotificationsUsageDescription": "Financial Copilot sends ledger digests, goal milestones, and streak reminders."
       }
     },
+    "notification": {
+      "icon": "./assets/images/notification-icon.png",
+      "color": "#1B4332"
+    },
     "android": {
       "package": "com.financialcopilot.app",
       "softwareKeyboardLayoutMode": "resize",
@@ -80,6 +84,12 @@
           "color": "#1B4332",
           "defaultChannel": "default",
           "sounds": []
+        }
+      ],
+      [
+        "./plugins/withAndroidNotificationLargeIcon.js",
+        {
+          "icon": "./assets/images/icon.png"
         }
       ]
     ],
