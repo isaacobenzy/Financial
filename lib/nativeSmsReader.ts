@@ -1,8 +1,7 @@
 /**
- * Optional native SMS bridge.
- * We never import `expo-transaction-sms-reader` by name here — Metro fails the
- * whole app bundle when that package is missing. Wire the real module in a
- * development / EAS Android build by installing it and setting USE_NATIVE_SMS.
+ * Optional native SMS bridge for Android development / EAS builds.
+ * Dynamically imports `expo-transaction-sms-reader` so Expo Go / web still boot
+ * when the native module is absent from the binary.
  */
 
 export type NativeSmsRow = {
@@ -31,7 +30,25 @@ export type NativeSmsReader = {
   openAppSettings: () => Promise<void>;
 };
 
-/** Always null until a native SMS module is explicitly wired for a dev build. */
+let cached: NativeSmsReader | null | undefined;
+
+/**
+ * Returns the native SMS reader when the module is linked into this binary.
+ * Always null in Expo Go / web / builds without the package.
+ */
 export async function getNativeSmsReader(): Promise<NativeSmsReader | null> {
-  return null;
+  if (cached !== undefined) return cached;
+
+  try {
+    const mod = await import('expo-transaction-sms-reader');
+    cached = {
+      ensurePermissionsAsync: mod.ensurePermissionsAsync,
+      getRecentMessages: mod.getRecentMessages,
+      openAppSettings: mod.openAppSettings,
+    };
+    return cached;
+  } catch {
+    cached = null;
+    return null;
+  }
 }

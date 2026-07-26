@@ -12,7 +12,17 @@ export type SmsMessage = {
   date: string;
 };
 
-export type SmsImportMode = 'native' | 'demo' | 'unavailable' | 'needs_dev_build';
+export type SmsImportMode =
+  | 'native'
+  | 'demo'
+  | 'unavailable'
+  | 'needs_dev_build'
+  | 'expo_go'
+  | 'native_missing'
+  | 'permission_denied'
+  | 'empty_inbox'
+  | 'timeout'
+  | 'scan_error';
 
 const PREFER_REAL_KEY = 'sms_prefer_real_v1';
 const SCAN_TIMEOUT_MS = 10_000;
@@ -86,14 +96,25 @@ function filterFinancial(messages: SmsMessage[]): SmsMessage[] {
   return messages.filter((m) => isFinancialSms(m.address, m.body));
 }
 
-function needsDevBuildResult(permissionGranted: boolean) {
+function expoGoResult(permissionGranted: boolean) {
   return {
     messages: [] as SmsMessage[],
     usingDemo: false,
-    mode: 'needs_dev_build' as const,
+    mode: 'expo_go' as const,
     permissionGranted,
     reason:
-      'SMS permission is on, but reading the inbox needs an Android development build (not Expo Go). Paste an SMS meanwhile, or run: pnpm android / EAS preview APK.',
+      'Expo Go cannot read the SMS inbox. Build a preview APK (pnpm build:android:preview) or use Paste SMS.',
+  };
+}
+
+function nativeMissingResult(permissionGranted: boolean) {
+  return {
+    messages: [] as SmsMessage[],
+    usingDemo: false,
+    mode: 'native_missing' as const,
+    permissionGranted,
+    reason:
+      'This install is missing the native SMS module. Rebuild the Android APK after installing expo-transaction-sms-reader, or use Paste SMS.',
   };
 }
 
@@ -135,7 +156,7 @@ export async function fetchInboxSms(options?: {
     return {
       messages: [],
       usingDemo: false,
-      mode: 'unavailable',
+      mode: 'permission_denied',
       permissionGranted: false,
       reason: 'SMS permission was denied.',
     };
@@ -152,13 +173,13 @@ export async function fetchInboxSms(options?: {
         permissionGranted: true,
       };
     }
-    return needsDevBuildResult(true);
+    return expoGoResult(true);
   }
 
   try {
     const smsReader = await getNativeSmsReader();
     if (!smsReader) {
-      return needsDevBuildResult(true);
+      return nativeMissingResult(true);
     }
 
     const scan = (async () => {
@@ -167,18 +188,19 @@ export async function fetchInboxSms(options?: {
         return {
           messages: [] as SmsMessage[],
           usingDemo: false,
-          mode: 'unavailable' as const,
+          mode: 'permission_denied' as const,
           permissionGranted: false,
           reason: 'SMS permission was denied by the reader module.',
         };
       }
 
       const since = Date.now() - 60 * 24 * 60 * 60 * 1000;
+      // Broad native fetch — app-side isFinancialSms is the source of truth for Ghana MoMo/banks
       const rows = await smsReader.getRecentMessages({
         limit: 200,
         sinceTimestamp: since,
-        onlyTransactions: true,
-        minConfidence: 0.35,
+        onlyTransactions: false,
+        minConfidence: 0.2,
         senderAllowlist: [
           'MTN',
           'MoMo',
@@ -205,7 +227,7 @@ export async function fetchInboxSms(options?: {
       return {
         messages: financial,
         usingDemo: false,
-        mode: 'native' as const,
+        mode: (financial.length ? 'native' : 'empty_inbox') as SmsImportMode,
         permissionGranted: true,
         reason: financial.length
           ? undefined
@@ -214,7 +236,7 @@ export async function fetchInboxSms(options?: {
     })();
 
     return await withTimeout(scan, SCAN_TIMEOUT_MS, 'SMS inbox scan');
-  } catch {
+  } catch (err) {
     if (allowDemoFallback) {
       return {
         messages: filterFinancial(DEMO_SMS),
@@ -223,7 +245,23 @@ export async function fetchInboxSms(options?: {
         permissionGranted: true,
       };
     }
-    return needsDevBuildResult(true);
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes('timed out')) {
+      return {
+        messages: [],
+        usingDemo: false,
+        mode: 'timeout',
+        permissionGranted: true,
+        reason: 'SMS inbox scan timed out. Try again or use Paste SMS.',
+      };
+    }
+    return {
+      messages: [],
+      usingDemo: false,
+      mode: 'scan_error',
+      permissionGranted: true,
+      reason: 'Could not read the SMS inbox. Try again or use Paste SMS.',
+    };
   }
 }
 

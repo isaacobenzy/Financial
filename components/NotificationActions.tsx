@@ -1,15 +1,20 @@
 import { useEffect } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
+  dismissNonLiveTrayAlerts,
   registerForPushNotifications,
   setupNotificationResponseListeners,
   warmPushStack,
 } from '@/lib/pushNotifications';
 import { startLiveActivityFeed } from '@/lib/liveActivityFeed';
 import { useNotificationSettingsStore } from '@/lib/notificationSettingsStore';
+import { scheduleStreakReminder } from '@/lib/notify';
 
 /**
  * Bootstrap push registration + deep-link listeners (BetLive pattern).
+ * Foreground hygiene clears stale non-live OS alerts so home/login do not
+ * feel like notifications "came back."
  */
 export default function NotificationActions() {
   const router = useRouter();
@@ -18,7 +23,6 @@ export default function NotificationActions() {
     let cleanup: (() => void) | undefined;
 
     (async () => {
-      // Warm native module + channels first so the first alert is instant
       void warmPushStack();
       await useNotificationSettingsStore.getState().hydrate();
       await registerForPushNotifications();
@@ -26,9 +30,23 @@ export default function NotificationActions() {
         router.push(href as never);
       });
       startLiveActivityFeed();
+      // Schedule evening streak once at boot (idempotent via stable id + daily gate)
+      void scheduleStreakReminder();
     })();
 
-    return () => cleanup?.();
+    const onAppState = (state: AppStateStatus) => {
+      if (state === 'active') {
+        void dismissNonLiveTrayAlerts();
+      }
+    };
+    const sub = AppState.addEventListener('change', onAppState);
+    // Clear stale tray alerts on first mount too
+    void dismissNonLiveTrayAlerts();
+
+    return () => {
+      cleanup?.();
+      sub.remove();
+    };
   }, [router]);
 
   return null;

@@ -2,6 +2,14 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supportsSystemNotifications } from '@/lib/runtime';
 import type { WidgetSnapshot } from '@/lib/widgetBridge';
+import {
+  clearLastLiveHash,
+  getLastLiveHash,
+  hashWidgetContent,
+  setLastLiveHash,
+  shouldNotifyToday,
+  markNotifiedToday,
+} from '@/lib/notificationPolicy';
 
 export type LiveSection = 'overview' | 'balance' | 'goals' | 'streak';
 
@@ -17,11 +25,12 @@ const SECTION_IDS: Record<LiveSection, string> = {
 
 export type LiveSectionPrefs = Record<LiveSection, boolean>;
 
+/** Opt-in by default — sticky widgets are easy to spam if always on. */
 const DEFAULT_PREFS: LiveSectionPrefs = {
-  overview: true,
-  balance: true,
-  goals: true,
-  streak: true,
+  overview: false,
+  balance: false,
+  goals: false,
+  streak: false,
 };
 
 export async function getLiveSectionPrefs(): Promise<LiveSectionPrefs> {
@@ -44,6 +53,7 @@ export async function setLiveSectionPref(
   if (!enabled) {
     await dismissSection(section);
   } else {
+    await clearLastLiveHash();
     await publishLiveSections();
   }
   return prefs;
@@ -100,19 +110,33 @@ async function postSticky(
   });
 }
 
+function anyLiveEnabled(prefs: LiveSectionPrefs): boolean {
+  return prefs.overview || prefs.balance || prefs.goals || prefs.streak;
+}
+
 /**
  * Publishes branded sticky notifications that act as lock-screen / shade
- * “live widgets” for each enabled section (Android). Uses the app notification
- * icon from the expo-notifications config plugin.
+ * “live widgets” for each enabled section (Android). Skips when content
+ * is unchanged so home focus / login do not re-spam the tray.
  */
 export async function publishLiveSections(snap?: WidgetSnapshot): Promise<void> {
   if (!supportsSystemNotifications()) return;
 
   try {
-    const Notifications = await import('expo-notifications');
+    const prefs = await getLiveSectionPrefs();
+    if (!anyLiveEnabled(prefs)) {
+      await clearLiveActivity();
+      await clearLastLiveHash();
+      return;
+    }
+
     const data =
       snap || (await (await import('@/lib/widgetBridge')).buildWidgetSnapshot());
-    const prefs = await getLiveSectionPrefs();
+    const hash = hashWidgetContent(data);
+    const last = await getLastLiveHash();
+    if (last === hash) return;
+
+    const Notifications = await import('expo-notifications');
     await ensureLiveChannel(Notifications);
 
     if (prefs.overview) {
@@ -129,6 +153,8 @@ export async function publishLiveSections(snap?: WidgetSnapshot): Promise<void> 
           .join(' · '),
         'home',
       );
+    } else {
+      await Notifications.dismissNotificationAsync(SECTION_IDS.overview).catch(() => undefined);
     }
 
     if (prefs.balance) {
@@ -141,6 +167,8 @@ export async function publishLiveSections(snap?: WidgetSnapshot): Promise<void> 
           : `${data.balanceDisplay} · tap to open ledger`,
         'home',
       );
+    } else {
+      await Notifications.dismissNotificationAsync(SECTION_IDS.balance).catch(() => undefined);
     }
 
     if (prefs.goals) {
@@ -153,6 +181,8 @@ export async function publishLiveSections(snap?: WidgetSnapshot): Promise<void> 
           : 'Add a goal to track progress here',
         'goals',
       );
+    } else {
+      await Notifications.dismissNotificationAsync(SECTION_IDS.goals).catch(() => undefined);
     }
 
     if (prefs.streak) {
@@ -165,7 +195,11 @@ export async function publishLiveSections(snap?: WidgetSnapshot): Promise<void> 
           : `Day ${data.streakCurrent} · open app to check in · best ${data.streakBest}d`,
         'home',
       );
+    } else {
+      await Notifications.dismissNotificationAsync(SECTION_IDS.streak).catch(() => undefined);
     }
+
+    await setLastLiveHash(hash);
   } catch {
     // ignore
   }
@@ -205,6 +239,7 @@ export async function clearLiveActivity(): Promise<void> {
         Notifications.dismissNotificationAsync(SECTION_IDS[key]).catch(() => undefined),
       ),
     );
+    await clearLastLiveHash();
   } catch {
     // ignore
   }
@@ -216,18 +251,27 @@ export async function notifyAuthEvent(
 ): Promise<void> {
   const { notifyUser } = await import('@/lib/notify');
   if (kind === 'login') {
-    // Toast + shade first; sticky widgets refresh in the background
-    void notifyUser(
-      'Signed in',
-      name ? `Welcome back, ${name}.` : 'Welcome back to Financial Copilot.',
-      'login',
-      { data: { screen: 'home' } },
-    );
+    // Toast only — no OS push spam on every sign-in. At most once per day.
+    if (await shouldNotifyToday('auth_welcome')) {
+      void notifyUser(
+        'Signed in',
+        name ? `Welcome back, ${name}.` : 'Welcome back to Financial Copilot.',
+        'login',
+        { surface: 'toast', data: { screen: 'home' } },
+      );
+      await markNotifiedToday('auth_welcome');
+    }
+    // Only refresh stickies if user opted into live sections
     if (supportsSystemNotifications()) {
-      void publishLiveSections();
+      const prefs = await getLiveSectionPrefs();
+      if (anyLiveEnabled(prefs)) {
+        void publishLiveSections();
+      }
     }
   } else {
     void clearLiveActivity();
-    void notifyUser('Signed out', 'Session ended. Live widgets cleared.', 'logout');
+    void notifyUser('Signed out', 'Session ended. Live widgets cleared.', 'logout', {
+      surface: 'toast',
+    });
   }
 }

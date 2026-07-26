@@ -209,7 +209,9 @@ export default function ExploreScreen() {
           <Text style={styles.permissionText}>
             {Platform.OS === 'android'
               ? 'Allow SMS access, then we import MoMo/bank alerts into your ledger and replace sample data with real rows.'
-              : 'iPhone cannot share the SMS inbox. Paste an alert, or try sample data below.'}
+              : Platform.OS === 'web'
+                ? 'Browsers cannot read your SMS inbox. Paste a MoMo/bank alert, or try sample data below. Use the Android APK for live inbox import.'
+                : 'This device cannot share the SMS inbox. Paste an alert, or try sample data below.'}
           </Text>
 
           {Platform.OS === 'android' ? (
@@ -263,7 +265,7 @@ export default function ExploreScreen() {
           <Text style={styles.permissionTitle}>No inbox data yet</Text>
           <Text style={styles.permissionText}>
             {reason ||
-              'Permission is on, but we could not load financial SMS. A development build is required for real inbox access in Expo.'}
+              'Permission is on, but we could not load financial SMS. Try Paste SMS, or rebuild a preview APK if the native SMS module is missing.'}
           </Text>
           <TouchableOpacity
             style={styles.permissionButton}
