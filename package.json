@@ -6,14 +6,13 @@
   "engines": {
     "node": ">=20.19.4"
   },
-  "packageManager": "pnpm@10.12.1",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
     "export:web": "expo export --platform web",
-    "deploy:web": "pnpm export:web && npx eas-cli@latest deploy",
+    "deploy:web": "npm run export:web && npx eas-cli@latest deploy",
     "build:android:preview": "npx eas-cli@latest build --platform android --profile preview",
     "build:android:dev": "npx eas-cli@latest build --platform android --profile development",
     "update:preview": "npx eas-cli@latest update --channel preview --message \"Preview update\"",

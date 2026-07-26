@@ -30,16 +30,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: pnpm
+          cache: npm
 
       - name: Setup Expo and EAS
         uses: expo/expo-github-action@v8
@@ -48,7 +43,7 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm ci
 
       - name: Ensure EAS project is linked
         run: |
@@ -61,7 +56,7 @@ jobs:
           fi
 
       - name: Export web
-        run: pnpm export:web
+        run: npm run export:web
 
       - name: Deploy to EAS Hosting
         run: eas deploy --non-interactive --prod
