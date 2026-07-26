@@ -35,36 +35,45 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check for EXPO_TOKEN
+        id: expo
         run: |
           if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
-            echo "Missing EXPO_TOKEN repository secret."
-            exit 1
+            echo "has_token=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Missing EXPO_TOKEN — skipping OTA publish."
+          else
+            echo "has_token=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Checkout
+        if: steps.expo.outputs.has_token == 'true'
         uses: actions/checkout@v5
 
       - name: Setup pnpm
+        if: steps.expo.outputs.has_token == 'true'
         uses: pnpm/action-setup@v4
         with:
           version: 10
 
       - name: Setup Node
+        if: steps.expo.outputs.has_token == 'true'
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: pnpm
 
       - name: Setup Expo and EAS
+        if: steps.expo.outputs.has_token == 'true'
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Install dependencies
+        if: steps.expo.outputs.has_token == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Publish update
+        if: steps.expo.outputs.has_token == 'true'
         run: |
           CHANNEL="${{ github.event.inputs.channel }}"
           MESSAGE="${{ github.event.inputs.message }}"
