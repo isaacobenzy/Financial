@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getLedgerBalance } from '@/lib/ledgerStore';
-import { getGoals } from '@/lib/goalsStore';
+import { getGoals, goalProgressPct, pickTopGoal } from '@/lib/goalsStore';
 import { getStreak } from '@/lib/achievements';
 import { isBalanceHidden } from '@/lib/privacy';
 
@@ -31,10 +31,8 @@ export async function buildWidgetSnapshot(): Promise<WidgetSnapshot> {
     isBalanceHidden(),
   ]);
 
-  const active = goals.filter((g) => g.period === 'monthly' && g.status !== 'completed');
-  const top = active[0] || goals.find((g) => g.period === 'monthly') || null;
-  const topGoalPct =
-    top && top.target > 0 ? Math.min(100, Math.round((top.current / top.target) * 100)) : 0;
+  const top = pickTopGoal(goals);
+  const topGoalPct = top ? goalProgressPct(top) : 0;
 
   const today = new Date().toISOString().slice(0, 10);
 

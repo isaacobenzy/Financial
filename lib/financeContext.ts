@@ -1,6 +1,7 @@
 import { getImportedTransactions, getLedgerBalance } from '@/lib/ledgerStore';
 import { getGoals } from '@/lib/goalsStore';
 import { SEED_GOALS } from '@/lib/goalsSeed';
+import { goalActionProtocolPrompt } from '@/lib/goalActions';
 
 export type Transaction = {
   id: string;
@@ -87,17 +88,23 @@ export async function getAllTransactions(): Promise<Transaction[]> {
       !t.id.includes('demo'),
   );
 
+  // Once real imports exist, never mix or fall back to sample rows.
   if (hasRealData) {
-    const realOnly = taggedImported.filter(
+    return taggedImported.filter(
       (t) =>
         !t.id.startsWith('demo-') &&
         !t.id.startsWith('sms-demo-') &&
         !t.id.includes('demo'),
     );
-    return realOnly;
   }
 
-  return [...taggedImported, ...DEMO_TRANSACTIONS];
+  // Empty ledger until the user imports — no synthetic Shoprite/salary samples.
+  return taggedImported.filter(
+    (t) =>
+      !t.id.startsWith('demo-') &&
+      !t.id.startsWith('sms-demo-') &&
+      !t.id.includes('demo'),
+  );
 }
 
 export async function buildFinanceSystemPrompt(): Promise<string> {
@@ -126,21 +133,22 @@ export async function buildFinanceSystemPrompt(): Promise<string> {
   const budgetLines = goals
     .map(
       (g) =>
-        `- ${g.name} (${g.period}, ${g.kind}): current ${g.current} / target ${g.target} ${balance.currency} — status ${g.status}`,
+        `- id:${g.id} | ${g.name} (${g.period}, ${g.kind}): current ${g.current} / target ${g.target} ${balance.currency} — status ${g.status}`,
     )
     .join('\n');
 
   const dataStatus = hasReal
-    ? 'Data status: Using REAL imported transactions from this device. Sample rows excluded.'
-    : 'DATA STATUS WARNING: No real SMS or paste imports yet. ALL transactions below are SAMPLE data. Tell the user to Import SMS or Paste SMS to get real answers about their actual money.';
+    ? 'Data status: Using REAL imported transactions from this device. Sample data has been cleared.'
+    : 'DATA STATUS WARNING: No real SMS or paste imports yet. The ledger is empty of real activity. Tell the user to Import SMS or Paste SMS — do not invent sample merchants or amounts.';
 
   return [
     'You are Financial Copilot, a personal finance assistant for THIS user only.',
     'STRICT SCOPE: Answer ONLY questions about their money, balance, spending, income, budgets, goals, SMS imports, transactions, savings habits, or short Ghana personal-finance tips grounded in the ledger below.',
     'The user can type free-form questions — still stay in scope.',
+    'You may suggest daily, weekly, monthly, or yearly goals/plans and propose create/update/delete/progress actions using the GOAL ACTIONS protocol.',
     'Off-topic (politics, coding, celebrities, homework, general chat): reply with exactly one short refusal and ask a finance question instead.',
     'Never invent merchants or amounts. If data is missing, say what is missing and suggest Import SMS or Paste SMS.',
-    'When using sample-only data, always mention it in the first sentence and explicitly recommend Import SMS / Paste SMS.',
+    'When the ledger has no real imports, say so clearly and recommend Import SMS / Paste SMS. Do not invent sample merchants.',
     'Prefer SMS-imported totals when present. Keep answers under 120 words. Use GHS.',
     '',
     dataStatus,
@@ -153,7 +161,9 @@ export async function buildFinanceSystemPrompt(): Promise<string> {
     'Recent transactions:',
     txLines || '- none imported yet',
     '',
-    'Financial goals (user-editable):',
+    'Financial goals (user-editable; include id when proposing updates):',
     budgetLines || '- none set yet',
+    '',
+    goalActionProtocolPrompt(),
   ].join('\n');
 }

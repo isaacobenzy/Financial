@@ -74,7 +74,12 @@ function computeFromTransactions(imported: Transaction[]): LedgerBalance {
     .filter((t) => t.type === 'expense')
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
-  const base = hasReal ? REAL_STARTING_BALANCE : DEMO_BASE_BALANCE;
+  // Empty ledger → 0. Demo-only leftovers keep the demo base until purged.
+  const base = hasReal
+    ? REAL_STARTING_BALANCE
+    : imported.length === 0
+      ? 0
+      : DEMO_BASE_BALANCE;
   const total = base + income - expenses;
 
   return {
@@ -88,13 +93,19 @@ function computeFromTransactions(imported: Transaction[]): LedgerBalance {
 }
 
 export async function getLedgerBalance(): Promise<LedgerBalance> {
+  const imported = await getImportedTransactions();
+  // Prefer live recompute when real data exists so demo-base cache cannot stick.
+  if (hasRealImportedTransactions(imported)) {
+    const balance = computeFromTransactions(imported);
+    await AsyncStorage.setItem(BALANCE_KEY, JSON.stringify(balance));
+    return balance;
+  }
   try {
     const cached = await AsyncStorage.getItem(BALANCE_KEY);
     if (cached) return JSON.parse(cached) as LedgerBalance;
   } catch {
     // fall through
   }
-  const imported = await getImportedTransactions();
   const balance = computeFromTransactions(imported);
   await AsyncStorage.setItem(BALANCE_KEY, JSON.stringify(balance));
   return balance;
@@ -148,6 +159,17 @@ export async function addImportedTransactions(
   await AsyncStorage.setItem(IMPORTED_KEY, JSON.stringify(trimmed));
   const balance = await recalculateLedgerBalance(trimmed, options?.smsReportedBalance ?? null);
   const added = Math.max(trimmed.length - beforeCount, next.length);
+
+  // After any real import, purge leftover sample rows / seed goals.
+  if (hasRealImportedTransactions(trimmed) || options?.replaceDemo) {
+    try {
+      const { ensureRealDataEverywhere } = await import('@/lib/sampleData');
+      await ensureRealDataEverywhere();
+    } catch {
+      // non-fatal
+    }
+  }
+
   return { transactions: trimmed, balance, added: Math.max(0, added) };
 }
 
