@@ -16,12 +16,14 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { tabBarClearance } from '@/constants/layout';
 import { theme } from '@/constants/theme';
 import { askOpenRouter, isOpenRouterConfigured, type ChatMessage } from '@/lib/openrouter';
 import { haptics } from '@/lib/haptics';
 import { recordActivity } from '@/lib/achievements';
 import { notificationService } from '@/lib/notificationStore';
+import { setTabBarHidden } from '@/lib/tabBarVisibility';
 
 const DEFAULT_PROMPTS = [
   'How much did I spend recently?',
@@ -87,6 +89,14 @@ export default function AssistantScreen() {
   ]);
 
   const configured = isOpenRouterConfigured();
+
+  // Absolute tab dock can still paint over stack screens — hide while focused.
+  useFocusEffect(
+    useCallback(() => {
+      setTabBarHidden(true);
+      return () => setTabBarHidden(false);
+    }, []),
+  );
 
   const quickPrompts = useMemo(() => {
     if (typeof params.suggest === 'string' && params.suggest.trim()) {
@@ -253,11 +263,13 @@ export default function AssistantScreen() {
     }
   };
 
+  // Always clear the floating tab dock height at rest (iOS was fully covered;
+  // Android only showed the top of the composer). Keyboard open: light cushion.
   const composerPadBottom = keyboardVisible
     ? Platform.OS === 'ios'
-      ? Math.max(16, insets.bottom + 4)
-      : Math.max(18, insets.bottom + 8)
-    : Math.max(insets.bottom + 22, 28);
+      ? 10
+      : 12
+    : tabBarClearance(insets.bottom) + (Platform.OS === 'ios' ? 10 : 6);
 
   const iosKbOffset = Math.max(insets.top + 8, 12);
 
@@ -281,6 +293,7 @@ export default function AssistantScreen() {
 
   const goBack = useCallback(() => {
     Keyboard.dismiss();
+    setTabBarHidden(false);
     if (router.canGoBack()) router.back();
     else router.replace('/(tabs)');
   }, [router]);
@@ -466,6 +479,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.paper,
+    zIndex: 100,
+    elevation: 30,
   },
   flex: {
     flex: 1,
@@ -621,6 +636,8 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.white,
     borderTopWidth: 1,
     borderTopColor: theme.colors.line,
+    zIndex: 40,
+    elevation: 24,
   },
   input: {
     flex: 1,

@@ -94,7 +94,7 @@ function RootLayoutNav() {
             <Stack.Screen
               name="assistant"
               options={{
-                presentation: 'card',
+                presentation: 'fullScreenModal',
                 animation: 'slide_from_bottom',
                 gestureEnabled: true,
               }}

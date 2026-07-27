@@ -5,6 +5,7 @@ import { Platform, StyleSheet, View } from 'react-native';
 import { TAB_BAR } from '@/constants/layout';
 import { theme } from '@/constants/theme';
 import { haptics } from '@/lib/haptics';
+import { useTabBarHidden } from '@/lib/tabBarVisibility';
 
 function TabIcon({
   name,
@@ -25,6 +26,8 @@ function TabIcon({
 }
 
 export default function TabLayout() {
+  const tabBarHidden = useTabBarHidden();
+
   return (
     <Tabs
       initialRouteName="index"
@@ -34,7 +37,7 @@ export default function TabLayout() {
         tabBarActiveTintColor: theme.colors.cedar,
         tabBarInactiveTintColor: theme.colors.tabInactive,
         tabBarLabelStyle: styles.label,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: tabBarHidden ? styles.tabBarHidden : styles.tabBar,
         tabBarItemStyle: styles.tabItem,
         tabBarHideOnKeyboard: true,
       }}
@@ -71,8 +74,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      {/* Hidden legacy routes — open via stack / Home AI button */}
-      <Tabs.Screen name="assistant" options={{ href: null }} />
+      {/* Hidden legacy route — open via stack / Home actions */}
       <Tabs.Screen name="import" options={{ href: null }} />
     </Tabs>
   );
@@ -96,6 +98,18 @@ const styles = StyleSheet.create({
     shadowOpacity: Platform.OS === 'web' ? 0.1 : 0.14,
     shadowRadius: Platform.OS === 'web' ? 18 : 16,
     elevation: 10,
+  },
+  tabBarHidden: {
+    display: 'none',
+    height: 0,
+    opacity: 0,
+    overflow: 'hidden',
+    borderWidth: 0,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: -200,
+    elevation: 0,
   },
   tabItem: {
     paddingTop: 2,

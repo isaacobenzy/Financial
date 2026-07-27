@@ -37,6 +37,7 @@ export default function AiFab() {
         onPress={async () => {
           await haptic('selection');
           const prompts = promptsForPath(pathname);
+          // Root stack route (not a tab) so the floating dock can be hidden.
           router.push({
             pathname: '/assistant',
             params: { suggest: prompts.join('|') },
