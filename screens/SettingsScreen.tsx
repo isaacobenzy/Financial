@@ -5,7 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,7 +13,6 @@ import { useFocusEffect, useRouter, useSegments } from 'expo-router';
 import {
   getPermissionStatuses,
   openAppSettings,
-  requestAllAppPermissions,
   requestPermission,
   type PermissionStatus,
 } from '@/lib/permissions';
@@ -22,6 +21,7 @@ import { tabContentPaddingBottom } from '@/constants/layout';
 import { theme } from '@/constants/theme';
 import NaviiAvatar from '@/components/NaviiAvatar';
 import { clearSession, getSession, type UserSession } from '@/lib/session';
+import { deleteOnDeviceAccountData } from '@/lib/deviceData';
 import {
   clearAppUnlock,
   getBiometricLabel,
@@ -45,7 +45,6 @@ export default function SettingsScreen() {
   const isTab = segments.includes('(tabs)');
   const [session, setSession] = useState<UserSession | null>(null);
   const [permissions, setPermissions] = useState<PermissionStatus[]>([]);
-  const [loadingPerms, setLoadingPerms] = useState(false);
   const [bioOn, setBioOn] = useState(false);
   const [bioAvailable, setBioAvailable] = useState(false);
   const [bioLabel, setBioLabel] = useState('Biometrics');
@@ -64,17 +63,6 @@ export default function SettingsScreen() {
       refresh();
     }, [refresh]),
   );
-
-  const grantAll = async () => {
-    setLoadingPerms(true);
-    try {
-      const next = await requestAllAppPermissions();
-      setPermissions(next);
-      notificationService.success('Permissions updated for this device');
-    } finally {
-      setLoadingPerms(false);
-    }
-  };
 
   const toggleBio = async (value: boolean) => {
     if (value) {
@@ -98,23 +86,60 @@ export default function SettingsScreen() {
     router.replace('/login');
   };
 
+  const deleteOnDevice = () => {
+    const email = session?.email;
+    if (!email) {
+      notificationService.error('Sign in first');
+      return;
+    }
+    Alert.alert(
+      'Delete data on this phone?',
+      'This removes the signed-in account, the ledger, and goals stored on this phone. Other accounts on this phone are kept, but they share this ledger, so those transactions are removed too. Nothing is sent to a server. A public privacy policy is not published in this build.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              await deleteOnDeviceAccountData(email);
+              await clearAppUnlock();
+              await notifyAuthEvent('logout');
+              router.replace('/login');
+            })();
+          },
+        },
+      ],
+    );
+  };
+
   const onPermPress = async (perm: PermissionStatus) => {
-    if (perm.alternateAction === 'paste-sms') {
-      router.push('/paste-sms');
+    if (perm.alternateAction === 'paste-sms' || perm.id === 'sms') {
+      router.push('/import-sms');
+      return;
+    }
+    if (perm.id === 'storage') {
+      notificationService.info(
+        'Files open through the system picker. This app does not request photo or storage access, and PDF statements are not imported.',
+      );
       return;
     }
     if (!perm.available) {
       notificationService.info(perm.description);
       return;
     }
-    if (perm.granted) {
+    if (perm.id === 'notifications' && perm.granted) {
       await openAppSettings();
       return;
     }
-    const ok = await requestPermission(perm.id);
-    setPermissions(await getPermissionStatuses());
-    if (ok) notificationService.success(`${perm.label} is on`, 'Permission granted');
-    else notificationService.error(`${perm.label} was denied`, 'Permission needed');
+    if (perm.id === 'notifications') {
+      const ok = await requestPermission(perm.id);
+      setPermissions(await getPermissionStatuses());
+      if (ok) notificationService.success(`${perm.label} is on`, 'Permission granted');
+      else notificationService.error(`${perm.label} was denied`, 'Permission needed');
+      return;
+    }
+    notificationService.info(perm.description);
   };
 
   const visiblePerms = permissions.filter((p) => p.id !== 'biometrics');
@@ -213,16 +238,6 @@ export default function SettingsScreen() {
         </SettingsSection>
 
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.primaryBtn} onPress={grantAll} disabled={loadingPerms}>
-            {loadingPerms ? (
-              <ActivityIndicator color={theme.colors.white} />
-            ) : (
-              <>
-                <MaterialCommunityIcons name="shield-check" size={18} color={theme.colors.white} />
-                <Text style={styles.primaryBtnText}>Grant available permissions</Text>
-              </>
-            )}
-          </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryBtn} onPress={openAppSettings}>
             <Text style={styles.secondaryBtnText}>Open system settings</Text>
           </TouchableOpacity>
@@ -260,10 +275,18 @@ export default function SettingsScreen() {
         <SettingsSection title="Account">
           <View style={styles.legalBox}>
             <Text style={styles.legalText}>
-              Ledger data stays on this device. SMS parsing is local. AI uses your ledger context via
-              OpenRouter.
+              The ledger and goals are stored on this phone. SMS text is parsed here. AI chat does not
+              send your ledger anywhere in this build, because there is no server and no provider key
+              in the app. A privacy policy URL is not included yet.
             </Text>
           </View>
+          <SettingsNavRow
+            icon="delete-outline"
+            label="Delete data on this phone"
+            description="Account, ledger, and goals stored here"
+            onPress={deleteOnDevice}
+            danger
+          />
           <SettingsNavRow
             icon="logout"
             label="Log out"
