@@ -18,8 +18,7 @@
       "bundleIdentifier": "com.financialcopilot.app",
       "infoPlist": {
         "NSFaceIDUsageDescription": "Financial Copilot uses Face ID to unlock the app and reveal a hidden balance.",
-        "NSUserNotificationsUsageDescription": "Financial Copilot sends ledger digests, goal milestones, and streak reminders.",
-        "ITSAppUsesNonExemptEncryption": false
+        "NSUserNotificationsUsageDescription": "Financial Copilot sends ledger digests, goal milestones, and streak reminders."
       }
     },
     "notification": {
