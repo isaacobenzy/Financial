@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Pressable,
   Animated,
+  Switch,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,6 +20,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { theme } from '@/constants/theme';
 import { askOpenRouter, isOpenRouterConfigured, type ChatMessage } from '@/lib/openrouter';
+import { hasFinancialShareConsent, setFinancialShareConsent } from '@/lib/aiShare';
 import { haptics } from '@/lib/haptics';
 import { recordActivity } from '@/lib/achievements';
 import { notificationService } from '@/lib/notificationStore';
@@ -39,11 +41,15 @@ type UiMessage = {
 
 function friendlyAiFailure(detail: string): { toast: string; bubble: string } {
   const lower = detail.toLowerCase();
-  if (lower.includes('not configured') || lower.includes('expo_public_openrouter')) {
+  if (
+    lower.includes('sharing is off') ||
+    lower.includes('ai is off') ||
+    lower.includes('nothing was sent') ||
+    lower.includes('not configured')
+  ) {
     return {
-      toast: 'This build is missing the OpenRouter API key.',
-      bubble:
-        'I can’t reach the AI service yet. Set EXPO_PUBLIC_OPENROUTER_API_KEY for this environment, then rebuild or restart with a cleared cache.',
+      toast: 'AI did not send your ledger',
+      bubble: detail,
     };
   }
   if (lower.includes('401') || lower.includes('unauthorized') || lower.includes('invalid api')) {
@@ -76,16 +82,21 @@ export default function AssistantScreen() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [shareConsent, setShareConsent] = useState(false);
   const [messages, setMessages] = useState<UiMessage[]>([
     {
       id: 'welcome',
       role: 'assistant',
       content:
-        'Hi — type below and send any question about your balance, spending, goals, or imports. I only answer finance questions about your account.',
+        'AI answers are off. This build has no server and no provider key, so your ledger is not sent anywhere. You can still keep a record of whether a future server may read it.',
     },
   ]);
 
   const configured = isOpenRouterConfigured();
+
+  useEffect(() => {
+    void hasFinancialShareConsent().then(setShareConsent);
+  }, []);
 
   const quickPrompts = useMemo(() => {
     if (typeof params.suggest === 'string' && params.suggest.trim()) {
@@ -237,18 +248,31 @@ export default function AssistantScreen() {
               </Text>
             </View>
           </View>
-          {!configured ? (
-            <View style={styles.configHint}>
-              <MaterialCommunityIcons
-                name="key-alert-outline"
-                size={16}
-                color={theme.colors.coral}
-              />
-              <Text style={styles.configHintText}>
-                AI isn’t configured on this build. Add the OpenRouter key, then rebuild.
-              </Text>
-            </View>
-          ) : null}
+          <View style={styles.configHint}>
+            <MaterialCommunityIcons
+              name={configured ? 'check-circle-outline' : 'cloud-off-outline'}
+              size={16}
+              color={theme.colors.cedar}
+            />
+            <Text style={styles.configHintText}>
+              {configured
+                ? 'A server is configured.'
+                : 'No server is connected. Chat cannot send your balance, transactions, or goals.'}
+            </Text>
+          </View>
+          <View style={styles.consentRow}>
+            <Text style={styles.consentText}>
+              If a server is added later, allow it to read my on-phone ledger to answer questions. Off by default. This build still sends nothing.
+            </Text>
+            <Switch
+              value={shareConsent}
+              onValueChange={(value) => {
+                setShareConsent(value);
+                void setFinancialShareConsent(value);
+              }}
+              accessibilityLabel="Consent to share the ledger with a future server"
+            />
+          </View>
         </View>
 
         {!keyboardVisible || windowHeight > 720 ? (
@@ -433,6 +457,18 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     color: theme.colors.cedarDeep,
     fontWeight: '600',
+  },
+  consentRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  consentText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+    color: theme.colors.muted,
   },
   quickPrompts: {
     paddingBottom: 4,
