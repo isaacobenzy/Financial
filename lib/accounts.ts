@@ -78,7 +78,10 @@ export async function authenticateAccount(
   // Legacy plaintext row. Upgrade only after the password matches. A mismatch
   // leaves the row untouched so the person can try again.
   if (account.password !== password) return null;
-  const upgraded: LocalAccount = { ...account, password: await hashPassword(password) };
+  const hashed = await hashPassword(password);
+  // Keep the existing row if the new verifier cannot be checked. Do not clear the account.
+  if (!verifyPassword(password, hashed)) return account;
+  const upgraded: LocalAccount = { ...account, password: hashed };
   list[idx] = upgraded;
   await saveAccounts(list);
   return upgraded;

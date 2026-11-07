@@ -21,7 +21,7 @@ import { tabContentPaddingBottom } from '@/constants/layout';
 import { theme } from '@/constants/theme';
 import NaviiAvatar from '@/components/NaviiAvatar';
 import { clearSession, getSession, type UserSession } from '@/lib/session';
-import { deleteOnDeviceAccountData } from '@/lib/deviceData';
+import { clearSharedOnDeviceFinancialData, deleteLocalAccount } from '@/lib/deviceData';
 import {
   clearAppUnlock,
   getBiometricLabel,
@@ -86,26 +86,45 @@ export default function SettingsScreen() {
     router.replace('/login');
   };
 
-  const deleteOnDevice = () => {
+  const deleteThisAccount = () => {
     const email = session?.email;
     if (!email) {
       notificationService.error('Sign in first');
       return;
     }
     Alert.alert(
-      'Delete data on this phone?',
-      'This removes the signed-in account, the ledger, and goals stored on this phone. Other accounts on this phone are kept, but they share this ledger, so those transactions are removed too. Nothing is sent to a server. A public privacy policy is not published in this build.',
+      'Delete this account on this phone?',
+      'This removes only the signed-in account. The ledger and goals stay, because every profile on this phone shares them. Nothing is sent to a server. A password verifier does not encrypt the ledger.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Delete account',
           style: 'destructive',
           onPress: () => {
             void (async () => {
-              await deleteOnDeviceAccountData(email);
-              await clearAppUnlock();
+              await deleteLocalAccount(email);
               await notifyAuthEvent('logout');
               router.replace('/login');
+            })();
+          },
+        },
+      ],
+    );
+  };
+
+  const clearSharedLedger = () => {
+    Alert.alert(
+      'Clear the shared ledger and goals?',
+      'Transactions and goals on this phone are shared by every profile. Clearing them removes that activity for all of those profiles. Account sign-in records stay. This cannot be undone from the app.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear shared data',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              await clearSharedOnDeviceFinancialData();
+              notificationService.success('Shared ledger and goals were cleared on this phone');
             })();
           },
         },
@@ -275,16 +294,23 @@ export default function SettingsScreen() {
         <SettingsSection title="Account">
           <View style={styles.legalBox}>
             <Text style={styles.legalText}>
-              The ledger and goals are stored on this phone. SMS text is parsed here. AI chat does not
-              send your ledger anywhere in this build, because there is no server and no provider key
-              in the app. A privacy policy URL is not included yet.
+              The ledger and goals are stored on this phone and are shared by every profile here.
+              SMS text is parsed here. This build does not send the ledger to a server. A stored
+              password verifier does not encrypt the ledger. There is no privacy-policy link in this build.
             </Text>
           </View>
           <SettingsNavRow
             icon="delete-outline"
-            label="Delete data on this phone"
-            description="Account, ledger, and goals stored here"
-            onPress={deleteOnDevice}
+            label="Delete this account"
+            description="Sign-in record only. The shared ledger stays."
+            onPress={deleteThisAccount}
+            danger
+          />
+          <SettingsNavRow
+            icon="trash-can-outline"
+            label="Clear shared ledger and goals"
+            description="Separate step. Affects every profile on this phone."
+            onPress={clearSharedLedger}
             danger
           />
           <SettingsNavRow

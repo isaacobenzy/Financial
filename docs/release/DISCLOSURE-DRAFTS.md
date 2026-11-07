@@ -22,7 +22,9 @@ On Android, this screen can ask to read SMS so it can look for mobile-money and 
 
 ## Deletion draft
 
-You can delete the on-phone account, ledger, and goals from Settings. That does not contact a server. The ledger is shared by local profiles on that phone, so deleting it removes imported transactions for those profiles too. Other account records on the phone are kept. A web deletion page does not exist yet. Google asks apps that create accounts for an in-app path and a web link: https://support.google.com/googleplay/android-developer/answer/13327111
+Draft only. Do not publish this as a policy.
+
+Deleting an account in Settings removes that sign-in record on the phone. It does not clear the ledger or goals, because those are shared by every profile on the phone. A separate action clears that shared ledger and goals and leaves other account records in place. Neither action contacts a server. A password verifier does not encrypt the ledger. A web deletion page does not exist yet. Google asks apps that create accounts for an in-app path and a web link: https://support.google.com/googleplay/android-developer/answer/13327111
 
 ## AI draft, if a server is added later
 
@@ -32,5 +34,6 @@ Do not ship this paragraph until a server exists. If the owner adds one, the not
 
 - Do not call the app a bank, wallet, payment service, or licensed adviser.
 - Do not say SMS parsing “stays on your phone” as a blanket promise if a later build uploads ledger text.
-- Do not say biometrics encrypt the ledger. They lock the screen for a short time.
+- Do not say biometrics or a password hash encrypt the ledger. Biometrics lock the screen for a short time. The hash only checks the password.
+- Do not set `ITSAppUsesNonExemptEncryption` until the owner answers Apple’s export question. This repo does not declare that flag.
 - Do not say PDF import works.

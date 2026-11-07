@@ -5,14 +5,11 @@ const IMPORTED_KEY = 'imported_transactions_v1';
 const BALANCE_KEY = 'ledger_balance_v1';
 
 /**
- * Older builds added GH₵ 12,500 to every total that was not taken from an SMS
- * "available balance" line. That number was sample data, not the user's money.
- * Cached totals that still match `12500 + income - expenses` are rewritten
- * without it. A cached total that does not match that formula is kept, because
- * an imported alert previously set it. Imported rows are never deleted here.
+ * New calculations do not add a sample opening balance. A balance already
+ * saved on the device is returned as stored. This file does not guess which
+ * saved totals included the old GH₵ 12,500 sample figure. See
+ * docs/release/LEDGER-TOTAL-MIGRATION.md. That rewrite is not implemented.
  */
-const LEGACY_FICTIONAL_OPENING = 12500;
-
 export type LedgerBalance = {
   total: number;
   income: number;
@@ -75,39 +72,42 @@ function computeFromTransactions(imported: Transaction[]): LedgerBalance {
   };
 }
 
-function sameMoney(a: LedgerBalance, b: LedgerBalance): boolean {
-  return (
-    a.total === b.total &&
-    a.income === b.income &&
-    a.expenses === b.expenses &&
-    a.smsImports === b.smsImports &&
-    a.currency === b.currency
-  );
+function emptyBalance(): LedgerBalance {
+  return {
+    total: 0,
+    income: 0,
+    expenses: 0,
+    currency: 'GHS',
+    updatedAt: new Date().toISOString(),
+    smsImports: 0,
+  };
+}
+
+async function readSavedBalance(): Promise<LedgerBalance | null> {
+  try {
+    const raw = await AsyncStorage.getItem(BALANCE_KEY);
+    if (!raw) return null;
+    const cached = JSON.parse(raw) as LedgerBalance;
+    if (!cached || typeof cached.total !== 'number') return null;
+    return cached;
+  } catch {
+    return null;
+  }
 }
 
 export async function getLedgerBalance(): Promise<LedgerBalance> {
-  const imported = await getImportedTransactions();
-  const fresh = computeFromTransactions(imported);
-  let cached: LedgerBalance | null = null;
-  try {
-    const raw = await AsyncStorage.getItem(BALANCE_KEY);
-    if (raw) cached = JSON.parse(raw) as LedgerBalance;
-  } catch {
-    cached = null;
+  const saved = await readSavedBalance();
+  if (saved) return saved;
+
+  const existing = await AsyncStorage.getItem(BALANCE_KEY);
+  if (existing) {
+    // Saved text could not be read as a balance. Leave it in place.
+    return emptyBalance();
   }
 
-  if (!cached) {
-    await AsyncStorage.setItem(BALANCE_KEY, JSON.stringify(fresh));
-    return fresh;
-  }
-
-  const legacyTotal = LEGACY_FICTIONAL_OPENING + fresh.income - fresh.expenses;
-  const fictionalOpening = cached.smsImports === 0 || cached.total === legacyTotal;
-  const next: LedgerBalance = fictionalOpening ? fresh : { ...fresh, total: cached.total };
-  if (!sameMoney(cached, next)) {
-    await AsyncStorage.setItem(BALANCE_KEY, JSON.stringify(next));
-  }
-  return next;
+  const fresh = computeFromTransactions(await getImportedTransactions());
+  await AsyncStorage.setItem(BALANCE_KEY, JSON.stringify(fresh));
+  return fresh;
 }
 
 export async function recalculateLedgerBalance(
@@ -116,9 +116,15 @@ export async function recalculateLedgerBalance(
 ): Promise<LedgerBalance> {
   const list = imported ?? (await getImportedTransactions());
   const computed = computeFromTransactions(list);
+  const previous = await readSavedBalance();
 
   if (typeof smsReportedBalance === 'number' && Number.isFinite(smsReportedBalance)) {
+    // The imported alert stated an available balance. That is part of the import the person just ran.
     computed.total = smsReportedBalance;
+  } else if (previous) {
+    const incomeDelta = computed.income - (Number(previous.income) || 0);
+    const expenseDelta = computed.expenses - (Number(previous.expenses) || 0);
+    computed.total = previous.total + incomeDelta - expenseDelta;
   }
 
   await AsyncStorage.setItem(BALANCE_KEY, JSON.stringify(computed));

@@ -12,12 +12,12 @@ Identity stays Financial Copilot, package/bundle `com.financialcopilot.app`, Exp
 
 - The client does not read or embed an OpenRouter API key. Chat does not call a provider. There is no backend in the repo, so no proxy was added.
 - Sharing the ledger requires an on-device consent flag, and even then nothing is sent.
-- Empty ledgers stay at zero. Sample merchants are not mixed into the transaction list. A cached total that still equals the old `12500 + income - expenses` formula is rewritten without the 12,500. A different cached total is kept because an alert may have set it. Imported rows are not deleted by that rewrite.
+- New installs with no saved balance total income minus expenses and do not mix in sample merchants. A balance already saved on the phone is left unchanged, including when it equals `12500 + income - expenses`. There is no automatic rewrite. A proposed opt-in is described in `LEDGER-TOTAL-MIGRATION.md` and is not implemented.
 - Picking a PDF does not report a successful import.
 - Android no longer declares photo/media read, broad external storage, `RECEIVE_SMS`, or exact-alarm permissions. `READ_SMS` remains for the import screen and is blocked until the in-app disclosure is accepted. Those permissions are also listed under `android.blockedPermissions`.
 - Notification permission is not requested at startup. The notifications screen can still ask.
-- New passwords are PBKDF2-HMAC-SHA256 verifiers (100,000 iterations). An older plaintext password is replaced only after that password signs in successfully. Accounts are not deleted by the upgrade.
-- Settings can delete the signed-in on-phone account plus the shared on-phone ledger and goals. Other local account rows remain. The ledger is not split per account.
+- New passwords are PBKDF2-HMAC-SHA256 verifiers (100,000 iterations). An older plaintext password is replaced only after that password signs in and the new verifier checks out. If the verifier cannot be checked, the existing row is left as stored. The hash does not encrypt the ledger.
+- Deleting an account removes that sign-in record only. The ledger and goals stay, because they are shared by every profile on the phone. A separate action clears that shared ledger and goals and does not delete other accounts.
 - New installs do not auto-create sample goals. Goals already saved on a device, including ones an older build seeded, stay until the person deletes on-phone data.
 - Duplicate automatic Android preview builds on `main` are reduced to `.eas/workflows/android-preview-build.yml`. `.eas/workflows/build.yml` is manual. Web preview no longer runs on pull requests.
 - Expo SDK 54 patch versions were aligned with current `expo-doctor` (`expo` 54.0.38 and the matching `expo-constants`, `expo-local-authentication`, `expo-updates`, and `jest-expo` patches). `expo-crypto` was added for random password salts when `crypto.getRandomValues` is missing.
@@ -30,7 +30,7 @@ Identity stays Financial Copilot, package/bundle `com.financialcopilot.app`, Exp
 4. Publish or reject the disclosure drafts in `DISCLOSURE-DRAFTS.md`. Do not ship them as policy until you confirm the wording.
 5. Account deletion web URL. Google requires an in-app path and a web link for apps that create accounts: <https://support.google.com/googleplay/android-developer/answer/13327111>. Apple requires in-app deletion when the app supports account creation: <https://developer.apple.com/app-store/review/guidelines/#5.1.1>. In-app deletion exists. A public web URL does not.
 6. Confirm Expo account `isaacobengz` owns the project, and whether an upload keystore, Play service account, FCM V1 key, Apple distribution certificate, and APNs key already exist there. This repo does not contain those files. Do not paste them into git.
-7. `ITSAppUsesNonExemptEncryption` is `false` because the app uses HTTPS and a local password hash, not a custom transport cipher. Confirm that answer in App Store Connect.
+7. Export compliance is an owner decision. `ITSAppUsesNonExemptEncryption` was added in an earlier commit on this branch and has been removed. The repo does not answer Apple’s encryption questionnaire. Set the flag only after the owner confirms the answer in App Store Connect. Password hashing is not a statement that the ledger is encrypted.
 8. `ios.supportsTablet` is still true, so iPad screenshots are required if you ship that setting.
 9. Turn on `expo-updates` code signing, or disable automatic OTA, before a store build. `components/NotificationActions.tsx` still checks for an update on launch.
 10. Streak reminders use a date trigger and no longer declare `SCHEDULE_EXACT_ALARM`, so delivery can be inexact. Expo’s own changelog says exact alarms must be declared when a precise timer is required.

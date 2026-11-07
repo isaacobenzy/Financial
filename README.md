@@ -325,8 +325,8 @@ Settings toggle. When on, feedback only for: **login success**, **tab bar**, **A
 
 - **iOS cannot read the SMS inbox** by design; Paste SMS is the intended path.
 - After **Allow SMS**, Expo Go exits quickly to Paste SMS / sample — it cannot hang on “Reading financial alerts…”. Real inbox needs `pnpm android` (dev build) with `expo-transaction-sms-reader`.
-- The ledger total is income minus expenses, unless an imported alert reported an available balance. The old GH₵ 12,500 opening figure is not part of that math.
-- Local accounts: sign up on the login screen, or use demo credentials to open an empty demo session. Tap your avatar to edit profile. Settings can delete the on-phone account, ledger, and goals.
+- A new balance, when none is saved yet, is income minus expenses unless an imported alert states an available balance. Totals already saved on a phone are not rewritten. See `docs/release/LEDGER-TOTAL-MIGRATION.md`.
+- Local accounts: sign up on the login screen, or use demo credentials to open an empty demo session. Tap your avatar to edit profile. Settings can delete that account without clearing the shared ledger. Clearing the ledger and goals is a separate action. A password verifier does not encrypt the ledger.
 - Store release notes and disclosure drafts: `docs/release/`. Those drafts need the owner's confirmation before they are published.
 
 ---
