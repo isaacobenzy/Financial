@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { getLedgerBalance, type LedgerBalance } from '@/lib/ledgerStore';
-import { DEMO_BALANCE } from '@/lib/financeContext';
 import { theme } from '@/constants/theme';
 import { isBalanceHidden, setBalanceHidden } from '@/lib/privacy';
 import { authenticateBiometric, isBiometricUnlockEnabled } from '@/lib/biometrics';
@@ -20,9 +19,9 @@ const MASK = '••••••';
 export default function BalanceHeader() {
   const [hidden, setHidden] = useState(false);
   const [balance, setBalance] = useState<LedgerBalance>({
-    total: DEMO_BALANCE.total,
-    income: DEMO_BALANCE.income,
-    expenses: DEMO_BALANCE.expenses,
+    total: 0,
+    income: 0,
+    expenses: 0,
     currency: 'GHS',
     updatedAt: new Date().toISOString(),
     smsImports: 0,
@@ -31,20 +30,7 @@ export default function BalanceHeader() {
   useFocusEffect(
     useCallback(() => {
       isBalanceHidden().then(setHidden);
-      getLedgerBalance().then((live) => {
-        if (live.smsImports > 0) {
-          setBalance(live);
-          return;
-        }
-        setBalance({
-          total: DEMO_BALANCE.total,
-          income: DEMO_BALANCE.income,
-          expenses: DEMO_BALANCE.expenses,
-          currency: 'GHS',
-          updatedAt: live.updatedAt,
-          smsImports: 0,
-        });
-      });
+      getLedgerBalance().then(setBalance);
     }, []),
   );
 
@@ -102,6 +88,9 @@ export default function BalanceHeader() {
             </View>
           </View>
           <Text style={styles.balanceAmount}>{show(balance.total)}</Text>
+          {balance.smsImports === 0 ? (
+            <Text style={styles.emptyNote}>No imported activity yet. Sample amounts are not added.</Text>
+          ) : null}
 
           <View style={styles.chips}>
             <View style={styles.chip}>
@@ -182,7 +171,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: theme.colors.white,
     marginTop: 8,
-    marginBottom: 16,
+    marginBottom: 8,
+  },
+  emptyNote: {
+    color: theme.colors.sage,
+    fontSize: 12,
+    lineHeight: 16,
+    marginBottom: 12,
   },
   chips: {
     flexDirection: 'row',

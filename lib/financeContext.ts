@@ -1,6 +1,5 @@
 import { getImportedTransactions, getLedgerBalance } from '@/lib/ledgerStore';
 import { getGoals } from '@/lib/goalsStore';
-import { SEED_GOALS } from '@/lib/goalsSeed';
 
 export type Transaction = {
   id: string;
@@ -11,70 +10,12 @@ export type Transaction = {
   date: string;
 };
 
-export const DEMO_BALANCE = {
-  total: 12500,
-  income: 15000,
-  expenses: 2500,
-  currency: 'GHS' as const,
-};
-
-export const DEMO_TRANSACTIONS: Transaction[] = [
-  {
-    id: 'demo-shoprite',
-    type: 'expense',
-    category: 'shopping',
-    merchant: 'Shoprite',
-    amount: -250,
-    date: '2024-03-29',
-  },
-  {
-    id: 'demo-salary',
-    type: 'income',
-    category: 'salary',
-    merchant: 'Employer Ltd',
-    amount: 5000,
-    date: '2024-03-28',
-  },
-  {
-    id: 'demo-uber',
-    type: 'expense',
-    category: 'transport',
-    merchant: 'Uber',
-    amount: -45,
-    date: '2024-03-28',
-  },
-  {
-    id: 'demo-kfc',
-    type: 'expense',
-    category: 'food',
-    merchant: 'KFC Accra',
-    amount: -85,
-    date: '2024-03-27',
-  },
-  {
-    id: 'demo-ecg',
-    type: 'expense',
-    category: 'utilities',
-    merchant: 'ECG Prepaid',
-    amount: -120,
-    date: '2024-03-26',
-  },
-];
-
-export const DEMO_BUDGETS = SEED_GOALS.map((g) => ({
-  name: g.name,
-  spent: g.spent,
-  budget: g.budget,
-}));
-
 export async function getAllTransactions(): Promise<Transaction[]> {
   const imported = await getImportedTransactions();
-  // Guarantee unique React keys even if old AsyncStorage ids collide with demos
-  const taggedImported = imported.map((t, i) => ({
+  return imported.map((t, i) => ({
     ...t,
-    id: t.id.startsWith('sms-') || t.id.startsWith('inbox-') ? t.id : `sms-${t.id}-${i}`,
+    id: t.id.startsWith('sms-') || t.id.startsWith('inbox-') || t.id.startsWith('pdf-') ? t.id : `sms-${t.id}-${i}`,
   }));
-  return [...taggedImported, ...DEMO_TRANSACTIONS];
 }
 
 export async function buildFinanceSystemPrompt(): Promise<string> {
