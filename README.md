@@ -45,18 +45,19 @@ Built with **Expo SDK 54**, **Expo Router**, and **React Native**.
 - **Type free-form messages** or tap quick prompts.
 - Grounded on your balance, imported transactions, and **live goals**.
 - Refuses off-topic questions (politics, coding, general chat, etc.).
-- Uses **OpenRouter** with an app-owned API key from `.env` (not editable in the UI).
+- AI chat is off in this build. There is no backend, and the app does not ship a provider API key.
 
 ### Import
 | Method | Platform | Notes |
 |--------|----------|--------|
 | SMS inbox (`/import-sms`) | Android | Permission-first landing → system allow prompt → scan. Real inbox needs a **dev build** (not Expo Go). Sample SMS available anytime. |
 | Paste SMS | iOS + Android | Paste a MoMo/bank alert; parsed on-device. |
-| PDF statement | Both | Document picker; demo processing in this build. |
+| PDF statement | Both | File picker only. The file is not read and nothing is added to the ledger. |
 
 ### Privacy & security
-- Ledger and goals stored on-device (AsyncStorage).
-- Biometric preference in SecureStore.
+- Ledger and goals stored on-device (AsyncStorage). New installs do not start with sample balances or sample goals.
+- Passwords are stored as PBKDF2 verifiers. Older plaintext passwords are replaced after a successful sign-in.
+- Biometric preference in SecureStore. That flag does not encrypt the ledger.
 - Soft unlock session (~5 minutes); returning after expiry can require biometrics again.
 - SMS parsing stays on the phone.
 
@@ -98,7 +99,7 @@ Floating AI (money icon) on **Home** and **Goals** opens **Assistant**, where yo
 app/                 Expo Router routes (tabs + stack screens)
 screens/             Screen UI implementations
 components/          BalanceHeader, GoalsWidget, AiFab, StreakCard, …
-lib/                 openrouter, ledgerStore, goalsStore, biometrics, permissions, …
+lib/                 ledgerStore, goalsStore, accounts, biometrics, permissions, aiShare, …
 utils/smsParser.ts   Ghana MoMo/bank SMS parsing
 constants/theme.ts   Cedar / sage / brass design tokens
 ```
@@ -108,47 +109,35 @@ constants/theme.ts   Cedar / sage / brass design tokens
 ## Setup
 
 ### Requirements
-- Node **≥ 20.19.4**
-- npm (ships with Node; CI and EAS use `package-lock.json`)
+- Node **≥ 20.19.4** (`.nvmrc` and EAS profiles pin `20.19.4`)
+- pnpm `10.33.3` (`packageManager` in `package.json`; CI uses `pnpm-lock.yaml`)
 - Expo Go **or** Android/iOS toolchain for a dev build
 
 ### Install
 
 ```bash
-npm install
+pnpm install
 ```
 
 ### Environment
 
-Copy `.env.example` → `.env` and set:
-
-```env
-EXPO_PUBLIC_OPENROUTER_API_KEY=sk-or-v1-your-key-here
-# optional:
-# EXPO_PUBLIC_OPENROUTER_MODEL=meta-llama/llama-3.2-3b-instruct
-```
-
-Restart Expo after changing `.env` (`npm start -- --clear`).
+Do not put a model-provider API key in `.env` or in the Expo project environment for this app. `EXPO_PUBLIC_*` values are compiled into the binary and the web bundle. Chat stays off until an authenticated backend exists. `.env.example` documents that limit.
 
 **Never commit** `.env` or real API keys.
-
-Local `expo start` / `expo run:android` / `expo run:ios` inline `EXPO_PUBLIC_*` the same way your working mobile build does. `app.config.js` also copies the key into `extra` so Expo Router / EAS bundles can resolve it via `Constants.expoConfig.extra` if needed.
-
-For **EAS Build**, **EAS Update**, and **EAS Hosting** (web preview), set the same `EXPO_PUBLIC_OPENROUTER_API_KEY` on the Expo project environment (`development` / `preview` / `production`) in the [Expo dashboard](https://expo.dev) so cloud builds match your local key. Without that, AI chat works locally but fails in shared APKs / preview URLs.
 
 ### Run
 
 ```bash
-npm start
+pnpm start
 # or clear cache:
-npm start -- --clear
+pnpm start -- --clear
 ```
 
 Then open in Expo Go, or:
 
 ```bash
-npm run android   # expo run:android — needed for real SMS inbox
-npm run ios
+pnpm android   # expo run:android — needed for real SMS inbox
+pnpm ios
 ```
 ---
 
@@ -336,8 +325,9 @@ Settings toggle. When on, feedback only for: **login success**, **tab bar**, **A
 
 - **iOS cannot read the SMS inbox** by design; Paste SMS is the intended path.
 - After **Allow SMS**, Expo Go exits quickly to Paste SMS / sample — it cannot hang on “Reading financial alerts…”. Real inbox needs `pnpm android` (dev build) with `expo-transaction-sms-reader`.
-- Real imports **replace demo ledger rows**.
-- Local accounts: sign up on the login screen, or use demo credentials. Tap your avatar to edit profile.
+- The ledger total is income minus expenses, unless an imported alert reported an available balance. The old GH₵ 12,500 opening figure is not part of that math.
+- Local accounts: sign up on the login screen, or use demo credentials to open an empty demo session. Tap your avatar to edit profile. Settings can delete the on-phone account, ledger, and goals.
+- Store release notes and disclosure drafts: `docs/release/`. Those drafts need the owner's confirmation before they are published.
 
 ---
 

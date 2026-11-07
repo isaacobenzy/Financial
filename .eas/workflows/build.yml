@@ -4,10 +4,9 @@ name: Build
 # Internal distribution (shareable install link):
 # https://docs.expo.dev/tutorial/eas/internal-distribution-builds/
 
+# Automatic preview APKs are started only by android-preview-build.yml.
+# This file stays manual so a push to main does not build the same APK twice.
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch: {}
 
 jobs:

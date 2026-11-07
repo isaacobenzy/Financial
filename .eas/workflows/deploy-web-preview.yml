@@ -9,14 +9,14 @@
 
 name: Deploy Web Preview
 
+# Preview hosting is manual, or a push to staging.
+# pull_request is omitted on purpose: Expo runs that trigger from the pull
+# request head, which would publish a public web preview for review PRs.
+# https://docs.expo.dev/eas/workflows/syntax/
 on:
   push:
     branches:
       - staging
-  pull_request:
-    branches:
-      - staging
-      - main
   workflow_dispatch: {}
 
 concurrency:
