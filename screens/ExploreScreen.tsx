@@ -39,6 +39,7 @@ export default function ExploreScreen() {
   const [reason, setReason] = useState<string | undefined>();
   const [importing, setImporting] = useState(false);
   const [liveBanner, setLiveBanner] = useState<{ title: string; subtitle: string } | null>(null);
+  const [smsDisclosureAccepted, setSmsDisclosureAccepted] = useState(false);
 
   const leaveScreen = () => {
     void haptic('selection');
@@ -111,7 +112,12 @@ export default function ExploreScreen() {
     setUsingDemo(false);
 
     if (Platform.OS === 'android') {
-      const granted = await requestPermission('sms');
+      if (!smsDisclosureAccepted) {
+        toast.info('Confirm the SMS disclosure before the permission prompt', 'SMS access');
+        setPhase('landing');
+        return;
+      }
+      const granted = await requestPermission('sms', { disclosureAccepted: true });
       if (!granted) {
         toast.info('Permission needed to read financial SMS', 'SMS access');
         setPhase('landing');
@@ -208,17 +214,38 @@ export default function ExploreScreen() {
           <Text style={styles.permissionTitle}>Connect your alerts</Text>
           <Text style={styles.permissionText}>
             {Platform.OS === 'android'
-              ? 'Allow SMS access, then we import MoMo/bank alerts into your ledger and replace sample data with real rows.'
+              ? 'On Android, this screen can ask to read SMS so it can look for mobile-money and bank alerts. Matching messages are parsed on this phone. This version does not upload SMS to a server. You can skip this and paste an alert instead.'
               : Platform.OS === 'web'
                 ? 'Browsers cannot read your SMS inbox. Paste a MoMo/bank alert, or try sample data below. Use the Android APK for live inbox import.'
                 : 'This device cannot share the SMS inbox. Paste an alert, or try sample data below.'}
           </Text>
 
           {Platform.OS === 'android' ? (
-            <TouchableOpacity style={styles.permissionButton} onPress={requestAndScan}>
-              <MaterialCommunityIcons name="message-check-outline" size={18} color={theme.colors.white} />
-              <Text style={styles.permissionButtonText}>Allow SMS & import</Text>
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={styles.disclosureRow}
+                onPress={() => setSmsDisclosureAccepted((value) => !value)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: smsDisclosureAccepted }}
+              >
+                <MaterialCommunityIcons
+                  name={smsDisclosureAccepted ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                  size={22}
+                  color={theme.colors.cedar}
+                />
+                <Text style={styles.disclosureText}>
+                  I understand this will ask Android for SMS access, only to find financial alerts on this phone.
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.permissionButton, !smsDisclosureAccepted && styles.permissionButtonDisabled]}
+                onPress={requestAndScan}
+                disabled={!smsDisclosureAccepted}
+              >
+                <MaterialCommunityIcons name="message-check-outline" size={18} color={theme.colors.white} />
+                <Text style={styles.permissionButtonText}>Continue to SMS permission</Text>
+              </TouchableOpacity>
+            </>
           ) : (
             <TouchableOpacity
               style={styles.permissionButton}
@@ -415,7 +442,21 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 8,
   },
+  permissionButtonDisabled: { opacity: 0.45 },
   permissionButtonText: { color: theme.colors.white, fontSize: 16, fontWeight: '700' },
+  disclosureRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginTop: 8,
+    paddingHorizontal: 4,
+  },
+  disclosureText: {
+    flex: 1,
+    color: theme.colors.ink,
+    fontSize: 14,
+    lineHeight: 20,
+  },
   demoButton: { padding: 12 },
   demoButtonText: { color: theme.colors.brass, fontSize: 14, fontWeight: '700' },
   settingsLink: { color: theme.colors.muted, fontSize: 13, textDecorationLine: 'underline' },

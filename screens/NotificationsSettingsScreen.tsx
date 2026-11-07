@@ -93,7 +93,7 @@ export default function NotificationsSettingsScreen() {
     if (enabled) {
       setBusy(true);
       try {
-        const next = await registerForPushNotifications();
+        const next = await registerForPushNotifications({ prompt: true });
         setToken(next);
         if (next) notificationService.success('Push notifications enabled');
         else if (expoGo) {
@@ -125,7 +125,7 @@ export default function NotificationsSettingsScreen() {
     setBusy(true);
     try {
       if (!token) {
-        const next = await registerForPushNotifications();
+        const next = await registerForPushNotifications({ prompt: true });
         setToken(next);
       }
       await sendActivityPush({

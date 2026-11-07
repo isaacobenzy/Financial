@@ -168,14 +168,16 @@ export async function warmPushStack(): Promise<void> {
   await ensureAndroidChannels(Notifications);
 }
 
-export async function registerForPushNotifications(): Promise<string | null> {
+export async function registerForPushNotifications(options?: {
+  prompt?: boolean;
+}): Promise<string | null> {
   const Notifications = await getNotifications();
   if (!Notifications) return null;
 
   try {
     const existing = await Notifications.getPermissionsAsync();
     let granted = existing.granted || existing.status === 'granted';
-    if (!granted) {
+    if (!granted && options?.prompt === true) {
       const asked = await Notifications.requestPermissionsAsync();
       granted = asked.granted || asked.status === 'granted';
     }
