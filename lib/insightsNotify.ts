@@ -119,6 +119,12 @@ async function checkSpendAnomaly(transactions: Transaction[]): Promise<void> {
 
 /** Home focus: refresh in-app widget data only — no streak OS spam. */
 export async function onAppOpenHygiene(): Promise<void> {
+  try {
+    const { ensureRealDataEverywhere } = await import('@/lib/sampleData');
+    await ensureRealDataEverywhere();
+  } catch {
+    // non-fatal
+  }
   await refreshWidgetSnapshot();
 }
 

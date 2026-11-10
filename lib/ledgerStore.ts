@@ -28,8 +28,16 @@ function normalizeTxId(id: string, index: number): string {
   ) {
     return id;
   }
-  // Legacy numeric SMS ids ("2","3") collided with React keys / demos
   return `sms-legacy-${id}-${index}`;
+}
+
+export function hasRealImportedTransactions(list: Transaction[]): boolean {
+  return list.some(
+    (t) =>
+      !t.id.startsWith('demo-') &&
+      !t.id.startsWith('sms-demo-') &&
+      !t.id.includes('demo'),
+  );
 }
 
 export async function getImportedTransactions(): Promise<Transaction[]> {
@@ -53,10 +61,20 @@ export async function getImportedTransactions(): Promise<Transaction[]> {
 }
 
 function computeFromTransactions(imported: Transaction[]): LedgerBalance {
-  const income = imported
+  const hasReal = hasRealImportedTransactions(imported);
+  const realImported = hasReal
+    ? imported.filter(
+        (t) =>
+          !t.id.startsWith('demo-') &&
+          !t.id.startsWith('sms-demo-') &&
+          !t.id.includes('demo'),
+      )
+    : imported;
+
+  const income = realImported
     .filter((t) => t.type === 'income')
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-  const expenses = imported
+  const expenses = realImported
     .filter((t) => t.type === 'expense')
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
@@ -68,7 +86,7 @@ function computeFromTransactions(imported: Transaction[]): LedgerBalance {
     expenses,
     currency: 'GHS',
     updatedAt: new Date().toISOString(),
-    smsImports: imported.length,
+    smsImports: realImported.length,
   };
 }
 
@@ -164,6 +182,17 @@ export async function addImportedTransactions(
   await AsyncStorage.setItem(IMPORTED_KEY, JSON.stringify(trimmed));
   const balance = await recalculateLedgerBalance(trimmed, options?.smsReportedBalance ?? null);
   const added = Math.max(trimmed.length - beforeCount, next.length);
+
+  // After any real import, purge leftover sample rows / seed goals.
+  if (hasRealImportedTransactions(trimmed) || options?.replaceDemo) {
+    try {
+      const { ensureRealDataEverywhere } = await import('@/lib/sampleData');
+      await ensureRealDataEverywhere();
+    } catch {
+      // non-fatal
+    }
+  }
+
   return { transactions: trimmed, balance, added: Math.max(0, added) };
 }
 

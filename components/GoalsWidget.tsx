@@ -4,7 +4,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { theme } from '@/constants/theme';
 import { haptic } from '@/lib/haptics';
-import { getGoals, type FinancialGoal } from '@/lib/goalsStore';
+import {
+  getGoals,
+  GOAL_PERIOD_LABELS,
+  pickTopGoal,
+  type FinancialGoal,
+} from '@/lib/goalsStore';
 
 export default function GoalsWidget() {
   const router = useRouter();
@@ -12,11 +17,13 @@ export default function GoalsWidget() {
 
   useFocusEffect(
     useCallback(() => {
-      getGoals().then((list) =>
-        setGoals(
-          list.filter((g) => g.period === 'monthly' && g.status !== 'completed').slice(0, 2),
-        ),
-      );
+      getGoals().then((list) => {
+        const active = list.filter((g) => g.status !== 'completed');
+        const top = pickTopGoal(list);
+        const rest = active.filter((g) => g.id !== top?.id);
+        const picks = [top, ...rest].filter(Boolean).slice(0, 2) as FinancialGoal[];
+        setGoals(picks);
+      });
     }, []),
   );
 
@@ -43,6 +50,7 @@ export default function GoalsWidget() {
               <View style={styles.rowTop}>
                 <Text style={styles.name} numberOfLines={1}>
                   {goal.name}
+                  <Text style={styles.periodTag}> · {GOAL_PERIOD_LABELS[goal.period]}</Text>
                 </Text>
                 <Text style={[styles.meta, over && styles.over]}>
                   GH₵ {goal.current} / {goal.target}
@@ -122,6 +130,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: theme.colors.ink,
     flex: 1,
+  },
+  periodTag: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.muted,
   },
   meta: {
     fontSize: 12,

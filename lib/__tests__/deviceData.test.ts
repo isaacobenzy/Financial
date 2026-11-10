@@ -1,18 +1,27 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { registerAccount } from '@/lib/accounts';
 import { clearSharedOnDeviceFinancialData, deleteLocalAccount } from '@/lib/deviceData';
 import { getGoals, upsertGoal } from '@/lib/goalsStore';
 import { addImportedTransactions, getLedgerBalance } from '@/lib/ledgerStore';
-import { saveSession } from '@/lib/session';
+import { getSession, saveSession } from '@/lib/session';
+
+const resetSecureStore = () =>
+  (SecureStore as unknown as { __reset: () => void }).__reset();
+
+async function accountEmails(): Promise<string[]> {
+  return Object.keys(JSON.parse((await SecureStore.getItemAsync('accounts_v2')) || '{}'));
+}
 
 describe('on-device account and shared ledger', () => {
   beforeEach(async () => {
     await AsyncStorage.clear();
+    resetSecureStore();
   });
 
   it('deletes only the signed-in account and leaves the shared ledger and the other account', async () => {
-    await registerAccount({ email: 'ada@example.com', password: 'secret1', name: 'Ada' });
-    await registerAccount({ email: 'bea@example.com', password: 'secret2', name: 'Bea' });
+    await registerAccount({ email: 'ada@example.com', password: 'secret12', name: 'Ada', acceptedTerms: true });
+    await registerAccount({ email: 'bea@example.com', password: 'secret22', name: 'Bea', acceptedTerms: true });
     await saveSession('ada@example.com', 'Ada');
     await upsertGoal({
       id: 'goal-rent',
@@ -38,16 +47,15 @@ describe('on-device account and shared ledger', () => {
 
     await deleteLocalAccount('ada@example.com');
 
-    const accounts = JSON.parse((await AsyncStorage.getItem('local_accounts_v1')) || '[]');
-    expect(accounts.map((account: { email: string }) => account.email)).toEqual(['bea@example.com']);
-    expect(await AsyncStorage.getItem('user_session_v1')).toBeNull();
+    expect(await accountEmails()).toEqual(['bea@example.com']);
+    expect(await getSession()).toBeNull();
     expect((await getGoals()).map((goal) => goal.name)).toEqual(['Rent']);
     expect((await getLedgerBalance()).total).toBe(balanceBefore);
     expect((await getLedgerBalance()).smsImports).toBe(1);
   }, 20000);
 
   it('clears the shared ledger only when that separate action is used', async () => {
-    await registerAccount({ email: 'bea@example.com', password: 'secret2', name: 'Bea' });
+    await registerAccount({ email: 'bea@example.com', password: 'secret22', name: 'Bea', acceptedTerms: true });
     await addImportedTransactions([
       {
         id: 'sms-1',
@@ -71,8 +79,7 @@ describe('on-device account and shared ledger', () => {
 
     await clearSharedOnDeviceFinancialData();
 
-    const accounts = JSON.parse((await AsyncStorage.getItem('local_accounts_v1')) || '[]');
-    expect(accounts.map((account: { email: string }) => account.email)).toEqual(['bea@example.com']);
+    expect(await accountEmails()).toEqual(['bea@example.com']);
     expect(await getGoals()).toEqual([]);
     expect((await getLedgerBalance()).smsImports).toBe(0);
     expect((await getLedgerBalance()).total).toBe(0);

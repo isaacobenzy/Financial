@@ -21,12 +21,15 @@ import {
   addGoalProgress,
   createEmptyGoal,
   getGoals,
+  GOAL_PERIOD_LABELS,
+  GOAL_PERIODS,
   goalProgressPct,
   markGoalComplete,
   removeGoal,
   reopenGoal,
   upsertGoal,
   type FinancialGoal,
+  type GoalPeriod,
 } from '@/lib/goalsStore';
 import { haptics } from '@/lib/haptics';
 import { recordActivity } from '@/lib/achievements';
@@ -62,13 +65,14 @@ function iconName(icon: string): keyof typeof MaterialCommunityIcons.glyphMap {
 export default function GoalsScreen() {
   const insets = useSafeAreaInsets();
   const [goals, setGoals] = useState<FinancialGoal[]>([]);
-  const [period, setPeriod] = useState<'monthly' | 'yearly'>('monthly');
+  const [period, setPeriod] = useState<GoalPeriod>('monthly');
   const [editing, setEditing] = useState<FinancialGoal | null>(null);
   const [isNewGoal, setIsNewGoal] = useState(false);
   const [name, setName] = useState('');
   const [target, setTarget] = useState('');
   const [current, setCurrent] = useState('');
   const [kind, setKind] = useState<'budget' | 'savings'>('savings');
+  const [editPeriod, setEditPeriod] = useState<GoalPeriod>('monthly');
 
   const refresh = useCallback(async () => {
     setGoals(await getGoals());
@@ -90,6 +94,7 @@ export default function GoalsScreen() {
     setTarget(String(g.target));
     setCurrent(String(g.current));
     setKind(g.kind);
+    setEditPeriod(g.period);
   };
 
   const closeModal = () => {
@@ -109,12 +114,13 @@ export default function GoalsScreen() {
       name: name.trim(),
       target: Math.max(0, Number(target) || 0),
       current: Math.max(0, Number(current) || 0),
-      period,
+      period: editPeriod,
       kind,
       status: editing.status,
     };
     const list = await upsertGoal(next);
     setGoals(list);
+    setPeriod(next.period);
     await recordActivity();
     await refreshWidgetSnapshot();
     notificationService.success(
@@ -211,8 +217,12 @@ export default function GoalsScreen() {
         </Text>
       </View>
 
-      <View style={styles.periodRow}>
-        {(['monthly', 'yearly'] as const).map((p) => (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.periodRow}
+      >
+        {GOAL_PERIODS.map((p) => (
           <TouchableOpacity
             key={p}
             style={[styles.periodBtn, period === p && styles.periodBtnActive]}
@@ -222,11 +232,11 @@ export default function GoalsScreen() {
             }}
           >
             <Text style={[styles.periodText, period === p && styles.periodTextActive]}>
-              {p === 'monthly' ? 'Monthly' : 'Yearly'}
+              {GOAL_PERIOD_LABELS[p]}
             </Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
 
       <ScrollView
         contentContainerStyle={[styles.list, { paddingBottom: tabContentPaddingBottom(insets.bottom) }]}
@@ -256,6 +266,8 @@ export default function GoalsScreen() {
                     GH₵ {goal.current.toLocaleString('en-GH')} / {goal.target.toLocaleString('en-GH')}
                     {' · '}
                     {goal.kind === 'savings' ? 'Savings' : 'Budget'}
+                    {' · '}
+                    {GOAL_PERIOD_LABELS[goal.period]}
                   </Text>
                 </View>
                 <Text style={styles.pctLabel}>{pct}%</Text>
@@ -293,7 +305,9 @@ export default function GoalsScreen() {
         ))}
 
         {!visible.length ? (
-          <Text style={styles.empty}>No {period} goals yet — add one below.</Text>
+          <Text style={styles.empty}>
+            No {GOAL_PERIOD_LABELS[period].toLowerCase()} goals yet — add one below.
+          </Text>
         ) : null}
 
         <TouchableOpacity style={styles.addBtn} onPress={() => openEdit()}>
@@ -331,6 +345,26 @@ export default function GoalsScreen() {
                   >
                     <Text style={[styles.kindText, kind === k && styles.kindTextActive]}>
                       {k === 'savings' ? 'Savings' : 'Budget'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.fieldLabel}>Period</Text>
+              <View style={styles.periodPickRow}>
+                {GOAL_PERIODS.map((p) => (
+                  <TouchableOpacity
+                    key={p}
+                    style={[styles.periodPickChip, editPeriod === p && styles.periodPickChipActive]}
+                    onPress={() => setEditPeriod(p)}
+                  >
+                    <Text
+                      style={[
+                        styles.periodPickText,
+                        editPeriod === p && styles.periodPickTextActive,
+                      ]}
+                    >
+                      {GOAL_PERIOD_LABELS[p]}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -457,13 +491,13 @@ const styles = StyleSheet.create({
   },
   periodRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
     paddingHorizontal: 16,
-    marginBottom: 8,
+    paddingBottom: 8,
   },
   periodBtn: {
-    flex: 1,
-    paddingVertical: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.white,
     borderWidth: 1,
@@ -474,8 +508,28 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.cedar,
     borderColor: theme.colors.cedar,
   },
-  periodText: { fontWeight: '700', color: theme.colors.muted },
+  periodText: { fontWeight: '700', color: theme.colors.muted, fontSize: 13 },
   periodTextActive: { color: theme.colors.white },
+  periodPickRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 4,
+  },
+  periodPickChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.line,
+    backgroundColor: theme.colors.paper,
+  },
+  periodPickChipActive: {
+    backgroundColor: theme.colors.sage,
+    borderColor: theme.colors.cedar,
+  },
+  periodPickText: { fontWeight: '700', color: theme.colors.muted, fontSize: 12 },
+  periodPickTextActive: { color: theme.colors.cedarDeep },
   list: { padding: 16, gap: 12 },
   sectionLabel: {
     marginTop: 8,

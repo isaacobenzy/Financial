@@ -10,14 +10,14 @@ import { haptic } from '@/lib/haptics';
 function promptsForPath(pathname: string): string[] {
   if (pathname.includes('goals')) {
     return [
-      'Am I on track for my monthly goals?',
+      'Am I on track for my weekly and monthly goals?',
+      'Create a weekly food budget based on my spending',
       'Which goal needs the most attention?',
-      'Suggest how to stay under budget this week',
     ];
   }
   return [
     'How much did I spend recently?',
-    'What is my current balance trend?',
+    'Suggest a weekly savings plan I can confirm',
     'Any unusual expenses I should review?',
   ];
 }
@@ -27,7 +27,8 @@ export default function AiFab() {
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
-  const bottom = tabBarClearance(insets.bottom);
+  // Sit a bit above the floating tab dock so the money chat control feels reachable.
+  const bottom = tabBarClearance(insets.bottom) + 18;
 
   return (
     <View pointerEvents="box-none" style={[styles.wrap, { bottom }]}>
@@ -36,6 +37,7 @@ export default function AiFab() {
         onPress={async () => {
           await haptic('selection');
           const prompts = promptsForPath(pathname);
+          // Root stack route (not a tab) so the floating dock can be hidden.
           router.push({
             pathname: '/assistant',
             params: { suggest: prompts.join('|') },

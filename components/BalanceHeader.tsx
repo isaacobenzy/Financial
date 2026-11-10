@@ -18,19 +18,23 @@ const MASK = '••••••';
 
 export default function BalanceHeader() {
   const [hidden, setHidden] = useState(false);
-  const [balance, setBalance] = useState<LedgerBalance>({
-    total: 0,
-    income: 0,
-    expenses: 0,
-    currency: 'GHS',
-    updatedAt: new Date().toISOString(),
-    smsImports: 0,
-  });
+  const [balance, setBalance] = useState<LedgerBalance | null>(null);
 
   useFocusEffect(
     useCallback(() => {
-      isBalanceHidden().then(setHidden);
-      getLedgerBalance().then(setBalance);
+      let active = true;
+      (async () => {
+        const [hide, live] = await Promise.all([
+          isBalanceHidden(),
+          getLedgerBalance(),
+        ]);
+        if (!active) return;
+        setHidden(hide);
+        setBalance(live);
+      })();
+      return () => {
+        active = false;
+      };
     }, []),
   );
 
@@ -57,6 +61,19 @@ export default function BalanceHeader() {
     setHidden(true);
     void refreshWidgetSnapshot();
   };
+
+  if (!balance) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.cardShell}>
+          <View style={[styles.balanceCard, styles.balanceCardLoading]}>
+            <Text style={styles.balanceLabel}>Total balance</Text>
+            <Text style={styles.balanceAmount}>—</Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   const show = (value: number) => (hidden ? MASK : formatMoney(value));
 
@@ -123,9 +140,11 @@ const styles = StyleSheet.create({
   balanceCard: {
     backgroundColor: theme.colors.cedar,
     padding: 20,
-    // Soft depth without requiring expo-linear-gradient native link issues
     borderWidth: 1,
     borderColor: 'rgba(216,229,221,0.18)',
+  },
+  balanceCardLoading: {
+    minHeight: 132,
   },
   topRow: {
     flexDirection: 'row',

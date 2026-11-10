@@ -2,25 +2,49 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const GOALS_KEY = 'financial_goals_v1';
 
+export type GoalPeriod = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+export const GOAL_PERIODS: GoalPeriod[] = ['daily', 'weekly', 'monthly', 'yearly'];
+
+export const GOAL_PERIOD_LABELS: Record<GoalPeriod, string> = {
+  daily: 'Daily',
+  weekly: 'Weekly',
+  monthly: 'Monthly',
+  yearly: 'Yearly',
+};
+
 export type FinancialGoal = {
   id: string;
   name: string;
   target: number;
   current: number;
-  period: 'monthly' | 'yearly';
+  period: GoalPeriod;
   kind: 'budget' | 'savings';
   icon: string;
   status: 'active' | 'completed';
 };
 
-function withStatus(goal: Omit<FinancialGoal, 'status'> & { status?: 'active' | 'completed' }): FinancialGoal {
+function normalizePeriod(value: unknown): GoalPeriod {
+  if (value === 'daily' || value === 'weekly' || value === 'monthly' || value === 'yearly') {
+    return value;
+  }
+  return 'monthly';
+}
+
+function withStatus(
+  goal: Omit<FinancialGoal, 'status' | 'period'> & {
+    status?: 'active' | 'completed';
+    period?: GoalPeriod | string;
+  },
+): FinancialGoal {
+  const period = normalizePeriod(goal.period);
   if (goal.status === 'completed') {
-    return { ...goal, status: 'completed' };
+    return { ...goal, period, status: 'completed' };
   }
   if (goal.kind === 'savings' && goal.target > 0 && goal.current >= goal.target) {
-    return { ...goal, status: 'completed' };
+    return { ...goal, period, status: 'completed' };
   }
-  return { ...goal, status: 'active' };
+  return { ...goal, period, status: 'active' };
 }
 
 export async function getGoals(): Promise<FinancialGoal[]> {
@@ -95,7 +119,7 @@ export function createEmptyGoal(partial?: Partial<FinancialGoal>): FinancialGoal
     name: partial?.name || 'New goal',
     target: partial?.target ?? 500,
     current: partial?.current ?? 0,
-    period: partial?.period ?? 'monthly',
+    period: normalizePeriod(partial?.period ?? 'monthly'),
     kind: partial?.kind ?? 'savings',
     icon: partial?.icon || 'piggy-bank-outline',
     status: 'active',
@@ -105,4 +129,18 @@ export function createEmptyGoal(partial?: Partial<FinancialGoal>): FinancialGoal
 export function goalProgressPct(goal: FinancialGoal): number {
   if (!goal.target) return 0;
   return Math.min(100, Math.round((goal.current / goal.target) * 100));
+}
+
+/** Prefer active monthly, then any active period, then any goal. */
+export function pickTopGoal(goals: FinancialGoal[]): FinancialGoal | null {
+  const active = goals.filter((g) => g.status !== 'completed');
+  return (
+    active.find((g) => g.period === 'monthly') ||
+    active.find((g) => g.period === 'weekly') ||
+    active.find((g) => g.period === 'daily') ||
+    active[0] ||
+    goals.find((g) => g.period === 'monthly') ||
+    goals[0] ||
+    null
+  );
 }

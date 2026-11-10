@@ -300,6 +300,11 @@ export default function SettingsScreen() {
             </Text>
           </View>
           <SettingsNavRow
+            icon="file-document-outline"
+            label="Terms & Conditions"
+            onPress={() => router.push('/terms')}
+          />
+          <SettingsNavRow
             icon="delete-outline"
             label="Delete this account"
             description="Sign-in record only. The shared ledger stays."
