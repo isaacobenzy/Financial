@@ -167,6 +167,16 @@ Configured in `app.json`.
 | `npm run lint` | ESLint |
 | `npm test` / `npm run test:ci` | Jest |
 | `npm run doctor` | expo-doctor |
+| `pnpm start:web` | Web dev server on your LAN (open it on a phone browser) |
+| `pnpm build:ci` | Web export check used by CI → `dist/` (no deploy) |
+| `pnpm validate` | typecheck + lint + unit tests |
+| `pnpm pipeline` | `validate` then `build:ci` — run this before opening a PR |
+| `pnpm deploy:preview` | Export + `eas deploy` (preview URL). Run by hand only |
+| `pnpm deploy:prod` | Export + `eas deploy --prod`. Run by hand only |
+
+CI (`.github/workflows/ci.yml`) runs install → Expo Doctor → typecheck → lint → tests → web export on every PR and push to `features`, `staging`, and `main`. It has read-only permissions and never deploys.
+
+On web, `expo-secure-store` has no implementation, so account and session records fall back to browser storage (`lib/secureKv.ts`). Native builds keep using the Keychain / Keystore.
 
 ---
 

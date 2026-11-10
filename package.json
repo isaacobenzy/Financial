@@ -12,7 +12,11 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "export:web": "expo export --platform web",
+    "start:web": "expo start --web --lan",
+    "export:web": "expo export --platform web --clear",
+    "build:ci": "expo export --platform web --output-dir dist --clear",
+    "deploy:preview": "pnpm export:web && npx eas-cli@latest deploy",
+    "deploy:prod": "pnpm export:web && npx eas-cli@latest deploy --prod",
     "deploy:web": "npm run export:web && npx eas-cli@latest deploy --alias preview",
     "deploy:web:preview": "npm run export:web && npx eas-cli@latest deploy --alias preview",
     "deploy:web:prod": "npm run export:web && npx eas-cli@latest deploy --prod",
@@ -25,7 +29,9 @@
     "typecheck": "tsc --noEmit",
     "test": "jest --watchAll",
     "test:ci": "jest --ci --watchAll=false",
-    "doctor": "npx expo-doctor"
+    "doctor": "npx expo-doctor",
+    "validate": "pnpm typecheck && pnpm lint && pnpm test:ci",
+    "pipeline": "pnpm validate && pnpm build:ci"
   },
   "jest": {
     "preset": "jest-expo",
