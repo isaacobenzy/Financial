@@ -3,8 +3,6 @@ import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { requestAllAppPermissions } from '@/lib/permissions';
-import { toast } from '@/lib/toast';
 import { theme } from '@/constants/theme';
 import { haptic } from '@/lib/haptics';
 
@@ -65,24 +63,8 @@ export default function ImportScreen() {
           </View>
           <Text style={styles.optionTitle}>Upload statement</Text>
           <Text style={styles.optionDescription}>
-            Choose a PDF bank or mobile-money report from your files
+            PDF statements are not read in this version. Choosing a file does not add transactions.
           </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.permCard}
-          onPress={async () => {
-            await haptic('medium');
-            await requestAllAppPermissions();
-            toast.success('Permission prompts shown');
-          }}
-        >
-          <MaterialCommunityIcons name="shield-check-outline" size={22} color={theme.colors.brass} />
-          <View style={styles.permCopy}>
-            <Text style={styles.permTitle}>Grant permissions</Text>
-            <Text style={styles.permText}>SMS, files, and notifications where available</Text>
-          </View>
-          <MaterialCommunityIcons name="chevron-right" size={22} color={theme.colors.muted} />
         </TouchableOpacity>
       </View>
     </SafeAreaView>

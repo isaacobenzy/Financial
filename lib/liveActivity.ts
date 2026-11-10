@@ -76,7 +76,7 @@ async function ensureLiveChannel(
   await Notifications.setNotificationChannelAsync('live', {
     name: 'Live lock-screen widgets',
     importance: Notifications.AndroidImportance.LOW,
-    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
     lightColor: BRAND,
     bypassDnd: false,
   });

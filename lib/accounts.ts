@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import { secureGet, secureSet } from '@/lib/secureKv';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isEnterpriseMode, allowDemoCredentials } from '@/lib/runtime';
 import {
@@ -12,7 +12,11 @@ import {
 import { TERMS_VERSION } from '@/lib/legal';
 
 const ACCOUNTS_KEY = 'accounts_v2';
-const LEGACY_ACCOUNTS_KEY = 'accounts_v1';
+/**
+ * Pre-v2 builds stored accounts in AsyncStorage under `local_accounts_v1`
+ * (plaintext passwords). Rows are migrated to a hashed v2 record on sign-in.
+ */
+const LEGACY_ACCOUNTS_KEY = 'local_accounts_v1';
 const DEMO_EMAIL = 'demo@financialcopilot.com';
 
 export type AccountRecord = {
@@ -39,7 +43,7 @@ export type RegisterResult =
 
 async function readAccounts(): Promise<Record<string, AccountRecord>> {
   try {
-    const raw = await SecureStore.getItemAsync(ACCOUNTS_KEY);
+    const raw = await secureGet(ACCOUNTS_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
     return Object(parsed) === parsed ? (parsed as Record<string, AccountRecord>) : {};
@@ -50,7 +54,7 @@ async function readAccounts(): Promise<Record<string, AccountRecord>> {
 
 async function writeAccounts(list: Record<string, AccountRecord>): Promise<void> {
   const payload = JSON.stringify(list);
-  await SecureStore.setItemAsync(ACCOUNTS_KEY, payload);
+  await secureSet(ACCOUNTS_KEY, payload);
 }
 
 function keyOf(email: string): string {
@@ -415,4 +419,30 @@ export async function changeAccountPassword(
   };
   await writeAccounts(accounts);
   return { ok: true };
+}
+
+/**
+ * Removes one sign-in record (v2 and any legacy plaintext row) from this phone.
+ * The shared ledger and goals are not touched; see lib/deviceData.ts.
+ */
+export async function deleteAccount(email: string): Promise<void> {
+  const key = keyOf(email);
+  if (!key) return;
+  const accounts = await readAccounts();
+  if (accounts[key]) {
+    delete accounts[key];
+    await writeAccounts(accounts);
+  }
+  try {
+    const legacy = await AsyncStorage.getItem(LEGACY_ACCOUNTS_KEY);
+    if (!legacy) return;
+    const list = JSON.parse(legacy) as LegacyAccountRecord[];
+    if (!Array.isArray(list)) return;
+    const kept = list.filter((l) => keyOf(l.email) !== key);
+    if (kept.length === list.length) return;
+    if (kept.length === 0) await AsyncStorage.removeItem(LEGACY_ACCOUNTS_KEY);
+    else await AsyncStorage.setItem(LEGACY_ACCOUNTS_KEY, JSON.stringify(kept));
+  } catch {
+    // non-fatal
+  }
 }

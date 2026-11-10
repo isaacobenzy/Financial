@@ -28,7 +28,7 @@ export default function NotificationActions() {
       void checkAndApplyUpdates();
       void warmPushStack();
       await useNotificationSettingsStore.getState().hydrate();
-      await registerForPushNotifications();
+      await registerForPushNotifications({ prompt: false });
       cleanup = await setupNotificationResponseListeners((href) => {
         router.push(href as never);
       });

@@ -15,8 +15,8 @@ type Feature = {
 const features: Feature[] = [
   {
     icon: 'wallet-outline',
-    title: 'Private ledger',
-    description: 'Hide balances, import SMS or paste alerts on-device',
+    title: 'Ledger on this phone',
+    description: 'Import or paste alerts. Balances start empty until you add activity.',
   },
   {
     icon: 'bullseye-arrow',
@@ -26,7 +26,7 @@ const features: Feature[] = [
   {
     icon: 'shield-lock-outline',
     title: 'Biometric unlock',
-    description: 'Face ID or fingerprint to open your account',
+    description: 'Face ID or fingerprint can lock the screen. It does not encrypt the saved ledger.',
   },
 ];
 
@@ -38,7 +38,7 @@ export default function OnboardingScreen() {
       <View style={styles.header}>
         <NaviiAvatar seed="financial-copilot-welcome" size={96} mood="wink" />
         <Text style={styles.title}>Welcome to{'\n'}Financial Copilot</Text>
-        <Text style={styles.caption}>Private ledger, goals, and grounded AI guidance</Text>
+        <Text style={styles.caption}>Track money on this phone. AI answers are off until a server is connected.</Text>
       </View>
 
       <View style={styles.features}>

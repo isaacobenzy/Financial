@@ -1,104 +1,24 @@
-import Constants from 'expo-constants';
-import { buildFinanceSystemPrompt } from '@/lib/financeContext';
-
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-
-type ExpoExtra = {
-  openRouterApiKey?: string;
-  openRouterModel?: string;
-};
-
-function readExtra(): ExpoExtra {
-  const fromConfig = Constants.expoConfig?.extra as ExpoExtra | undefined;
-  if (fromConfig) return fromConfig;
-  const legacy = (Constants as { manifest?: { extra?: ExpoExtra } }).manifest?.extra;
-  return legacy ?? {};
-}
-
-/**
- * Resolve OpenRouter key the same way a local Expo Router / native build does:
- * 1) Metro-inlined EXPO_PUBLIC_* (dev + export)
- * 2) app.config.js → extra (EAS Build / Hosting when env is present at config eval)
- */
-function getOpenRouterApiKey(): string | null {
-  const fromEnv = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY?.trim();
-  if (fromEnv) return fromEnv;
-
-  const fromExtra = readExtra().openRouterApiKey?.trim();
-  if (fromExtra) return fromExtra;
-
-  return null;
-}
-
-function getOpenRouterModel(): string {
-  const fromEnv = process.env.EXPO_PUBLIC_OPENROUTER_MODEL?.trim();
-  if (fromEnv) return fromEnv;
-
-  const fromExtra = readExtra().openRouterModel?.trim();
-  if (fromExtra) return fromExtra;
-
-  return 'meta-llama/llama-3.2-3b-instruct';
-}
-
-/** Small model — override with EXPO_PUBLIC_OPENROUTER_MODEL in .env */
-export const DEFAULT_OPENROUTER_MODEL = getOpenRouterModel();
+import { decideFinancialShare, isAiConfigured } from '@/lib/aiShare';
 
 export type ChatMessage = {
   role: 'system' | 'user' | 'assistant';
   content: string;
 };
 
+/**
+ * Chat entry point. Does not read EXPO_PUBLIC_OPENROUTER_API_KEY or any other
+ * client secret, and does not call a model provider. A safe design needs an
+ * authenticated backend the owner operates. This repo does not have one, and
+ * inventing a proxy that still embeds a billable key would not be safe.
+ */
 export function isOpenRouterConfigured(): boolean {
-  return Boolean(getOpenRouterApiKey());
+  return isAiConfigured();
 }
 
 export async function askOpenRouter(
-  userMessage: string,
-  history: ChatMessage[] = [],
+  _userMessage: string,
+  _history: ChatMessage[] = [],
 ): Promise<string> {
-  const apiKey = getOpenRouterApiKey();
-  if (!apiKey) {
-    throw new Error(
-      'AI is not configured. Set EXPO_PUBLIC_OPENROUTER_API_KEY in .env (local) or the Expo project environment (EAS), then rebuild / restart with a cleared cache.',
-    );
-  }
-
-  const systemPrompt = await buildFinanceSystemPrompt();
-
-  const messages: ChatMessage[] = [
-    { role: 'system', content: systemPrompt },
-    ...history.slice(-8),
-    { role: 'user', content: userMessage },
-  ];
-
-  const response = await fetch(OPENROUTER_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://github.com/isaacobenzy/Financial',
-      'X-Title': 'Financial Copilot',
-    },
-    body: JSON.stringify({
-      model: getOpenRouterModel(),
-      messages,
-      temperature: 0.3,
-      max_tokens: 450,
-    }),
-  });
-
-  const data = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const detail =
-      data?.error?.message || data?.message || `OpenRouter error (${response.status})`;
-    throw new Error(detail);
-  }
-
-  const content = data?.choices?.[0]?.message?.content;
-  if (!content || typeof content !== 'string') {
-    throw new Error('No response from the model. Try again.');
-  }
-
-  return content.trim();
+  const decision = await decideFinancialShare();
+  throw new Error(decision.message);
 }

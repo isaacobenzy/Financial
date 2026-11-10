@@ -1,6 +1,5 @@
 import { getImportedTransactions, getLedgerBalance } from '@/lib/ledgerStore';
 import { getGoals } from '@/lib/goalsStore';
-import { SEED_GOALS } from '@/lib/goalsSeed';
 import { goalActionProtocolPrompt } from '@/lib/goalActions';
 
 export type Transaction = {
@@ -12,99 +11,22 @@ export type Transaction = {
   date: string;
 };
 
-export const DEMO_BALANCE = {
-  total: 0,
-  income: 0,
-  expenses: 0,
-  currency: 'GHS' as const,
-};
-
-export const DEMO_TRANSACTIONS: Transaction[] = [
-  {
-    id: 'demo-shoprite',
-    type: 'expense',
-    category: 'shopping',
-    merchant: 'Shoprite',
-    amount: -250,
-    date: '2024-03-29',
-  },
-  {
-    id: 'demo-salary',
-    type: 'income',
-    category: 'salary',
-    merchant: 'Employer Ltd',
-    amount: 5000,
-    date: '2024-03-28',
-  },
-  {
-    id: 'demo-uber',
-    type: 'expense',
-    category: 'transport',
-    merchant: 'Uber',
-    amount: -45,
-    date: '2024-03-28',
-  },
-  {
-    id: 'demo-kfc',
-    type: 'expense',
-    category: 'food',
-    merchant: 'KFC Accra',
-    amount: -85,
-    date: '2024-03-27',
-  },
-  {
-    id: 'demo-ecg',
-    type: 'expense',
-    category: 'utilities',
-    merchant: 'ECG Prepaid',
-    amount: -120,
-    date: '2024-03-26',
-  },
-];
-
-export const DEMO_BUDGETS = SEED_GOALS.map((g) => ({
-  name: g.name,
-  spent: g.spent,
-  budget: g.budget,
-}));
+function isSampleId(id: string): boolean {
+  return id.startsWith('demo-') || id.startsWith('sms-demo-') || id.includes('demo');
+}
 
 export async function getAllTransactions(): Promise<Transaction[]> {
   const imported = await getImportedTransactions();
-  const taggedImported: Transaction[] = imported.map((t, i) => ({
-    ...t,
-    id:
-      t.id.startsWith('sms-') ||
-      t.id.startsWith('inbox-') ||
-      t.id.startsWith('pdf-') ||
-      t.id.startsWith('demo-')
-        ? t.id
-        : `sms-${t.id}-${i}`,
-  }));
-
-  const hasRealData = taggedImported.some(
-    (t) =>
-      !t.id.startsWith('demo-') &&
-      !t.id.startsWith('sms-demo-') &&
-      !t.id.includes('demo'),
-  );
-
-  // Once real imports exist, never mix or fall back to sample rows.
-  if (hasRealData) {
-    return taggedImported.filter(
-      (t) =>
-        !t.id.startsWith('demo-') &&
-        !t.id.startsWith('sms-demo-') &&
-        !t.id.includes('demo'),
-    );
-  }
-
-  // Empty ledger until the user imports — no synthetic Shoprite/salary samples.
-  return taggedImported.filter(
-    (t) =>
-      !t.id.startsWith('demo-') &&
-      !t.id.startsWith('sms-demo-') &&
-      !t.id.includes('demo'),
-  );
+  // Real imports only — never mix in or fall back to sample rows.
+  return imported
+    .filter((t) => !isSampleId(t.id))
+    .map((t, i) => ({
+      ...t,
+      id:
+        t.id.startsWith('sms-') || t.id.startsWith('inbox-') || t.id.startsWith('pdf-')
+          ? t.id
+          : `sms-${t.id}-${i}`,
+    }));
 }
 
 export async function buildFinanceSystemPrompt(): Promise<string> {

@@ -116,7 +116,7 @@ export async function getPermissionStatuses(): Promise<PermissionStatus[]> {
       {
         id: 'storage',
         label: 'Files & documents',
-        description: 'Pick PDF bank statements with the system file picker',
+        description: 'The system file picker is used. PDF statements are not imported in this version.',
         granted: true,
         available: true,
       },
@@ -152,7 +152,7 @@ export async function getPermissionStatuses(): Promise<PermissionStatus[]> {
       {
         id: 'storage',
         label: 'Files & documents',
-        description: 'Pick PDF bank statements',
+        description: 'The system file picker is used. PDF statements are not imported in this version.',
         granted: true,
         available: true,
       },
@@ -175,30 +175,19 @@ export async function getPermissionStatuses(): Promise<PermissionStatus[]> {
 
   const smsGranted = await checkAndroidPermission(PermissionsAndroid.PERMISSIONS.READ_SMS);
 
-  let storageGranted = true;
-  if (Number(Platform.Version) >= 33) {
-    storageGranted = await checkAndroidPermission(
-      PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES,
-    );
-  } else {
-    storageGranted = await checkAndroidPermission(
-      PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
-    );
-  }
-
   return [
     {
       id: 'sms',
       label: 'Read SMS',
-      description: 'Import MoMo and bank alerts from your inbox',
+      description: 'Import MoMo and bank alerts from your inbox. Asked only on the import screen.',
       granted: smsGranted,
       available: true,
     },
     {
       id: 'storage',
-      label: 'Files & media',
-      description: 'Upload PDF statements',
-      granted: storageGranted,
+      label: 'Files',
+      description: 'The system file picker is used. Photo and storage access are not requested.',
+      granted: true,
       available: true,
     },
     {
@@ -220,7 +209,10 @@ export async function getPermissionStatuses(): Promise<PermissionStatus[]> {
   ];
 }
 
-export async function requestPermission(id: PermissionId): Promise<boolean> {
+export async function requestPermission(
+  id: PermissionId,
+  options?: { disclosureAccepted?: boolean },
+): Promise<boolean> {
   if (id === 'biometrics') {
     const { enableBiometricUnlock, setBiometricUnlockEnabled, isBiometricUnlockEnabled } =
       await import('@/lib/biometrics');
@@ -249,6 +241,9 @@ export async function requestPermission(id: PermissionId): Promise<boolean> {
 
   try {
     if (id === 'sms') {
+      const alreadyGranted = await checkAndroidPermission(PermissionsAndroid.PERMISSIONS.READ_SMS);
+      if (alreadyGranted) return true;
+      if (!options?.disclosureAccepted) return false;
       const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.READ_SMS, {
         title: 'SMS permission',
         message:
@@ -261,29 +256,8 @@ export async function requestPermission(id: PermissionId): Promise<boolean> {
     }
 
     if (id === 'storage') {
-      if (Number(Platform.Version) >= 33) {
-        const result = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES,
-          {
-            title: 'Files permission',
-            message: 'Allow access so you can upload PDF bank statements.',
-            buttonPositive: 'Allow',
-            buttonNegative: 'Deny',
-          },
-        );
-        return result === PermissionsAndroid.RESULTS.GRANTED;
-      }
-
-      const result = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
-        {
-          title: 'Storage permission',
-          message: 'Allow storage access so you can upload PDF bank statements.',
-          buttonPositive: 'Allow',
-          buttonNegative: 'Deny',
-        },
-      );
-      return result === PermissionsAndroid.RESULTS.GRANTED;
+      // The system document picker grants access to the file the person picks.
+      return true;
     }
   } catch {
     return false;
@@ -292,11 +266,8 @@ export async function requestPermission(id: PermissionId): Promise<boolean> {
   return false;
 }
 
+/** Notifications only. SMS and storage are not bundled into one prompt. */
 export async function requestAllAppPermissions(): Promise<PermissionStatus[]> {
-  if (Platform.OS === 'android') {
-    await requestPermission('sms');
-    await requestPermission('storage');
-  }
   await requestPermission('notifications');
   return getPermissionStatuses();
 }

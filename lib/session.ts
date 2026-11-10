@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import { secureDelete, secureGet, secureSet } from '@/lib/secureKv';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { seedFromEmail } from '@/lib/navii';
 
@@ -15,7 +15,7 @@ export type UserSession = {
 
 async function readSecureSession(): Promise<UserSession | null> {
   try {
-    const raw = await SecureStore.getItemAsync(SECURE_SESSION_KEY);
+    const raw = await secureGet(SECURE_SESSION_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return null;
@@ -26,7 +26,7 @@ async function readSecureSession(): Promise<UserSession | null> {
 }
 
 async function writeSecureSession(session: UserSession): Promise<void> {
-  await SecureStore.setItemAsync(SECURE_SESSION_KEY, JSON.stringify(session));
+  await secureSet(SECURE_SESSION_KEY, JSON.stringify(session));
 }
 
 async function migrateLegacySession(): Promise<UserSession | null> {
@@ -124,7 +124,7 @@ export async function updateSession(patch: {
 
 export async function clearSession(): Promise<void> {
   try {
-    await SecureStore.deleteItemAsync(SECURE_SESSION_KEY);
+    await secureDelete(SECURE_SESSION_KEY);
   } catch {
     // non-fatal
   }

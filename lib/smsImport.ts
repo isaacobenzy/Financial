@@ -156,9 +156,11 @@ export async function prefersRealSms(): Promise<boolean> {
   }
 }
 
-export async function ensureSmsPermission(): Promise<boolean> {
+export async function ensureSmsPermission(options?: {
+  disclosureAccepted?: boolean;
+}): Promise<boolean> {
   if (Platform.OS !== 'android') return true;
-  return requestPermission('sms');
+  return requestPermission('sms', { disclosureAccepted: options?.disclosureAccepted === true });
 }
 
 function filterFinancial(messages: SmsMessage[]): SmsMessage[] {
@@ -193,6 +195,7 @@ function nativeMissingResult(permissionGranted: boolean) {
  */
 export async function fetchInboxSms(options?: {
   allowDemoFallback?: boolean;
+  disclosureAccepted?: boolean;
   scanDays?: number;
 }): Promise<{
   messages: SmsMessage[];
@@ -222,7 +225,9 @@ export async function fetchInboxSms(options?: {
     };
   }
 
-  const granted = await ensureSmsPermission();
+  const granted = await ensureSmsPermission({
+    disclosureAccepted: options?.disclosureAccepted === true,
+  });
   if (!granted) {
     return {
       messages: [],

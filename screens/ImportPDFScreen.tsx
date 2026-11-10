@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
 import { toast } from '@/lib/toast';
+import { describePdfPick } from '@/lib/pdfImport';
 import { theme } from '@/constants/theme';
 import { haptic } from '@/lib/haptics';
 
 export default function ImportPDFScreen() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const [pickedName, setPickedName] = useState<string | null>(null);
 
   const leave = () => {
     void haptic('selection');
@@ -26,13 +27,11 @@ export default function ImportPDFScreen() {
       });
 
       if (!result.canceled) {
-        setLoading(true);
-        setTimeout(async () => {
-          setLoading(false);
-          await haptic('success');
-          toast.success('PDF processed successfully');
-          router.replace('/transactions');
-        }, 2000);
+        const name = result.assets?.[0]?.name || 'PDF';
+        const outcome = describePdfPick(name);
+        setPickedName(outcome.fileName);
+        await haptic('selection');
+        toast.info(outcome.message, 'PDF import is off');
       }
     } catch {
       await haptic('error');
@@ -51,22 +50,17 @@ export default function ImportPDFScreen() {
       </View>
 
       <View style={styles.content}>
-        <TouchableOpacity
-          style={styles.uploadArea}
-          onPress={handlePDFPick}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator size="large" color={theme.colors.cedar} />
-          ) : (
-            <>
-              <View style={styles.iconBadge}>
-                <MaterialCommunityIcons name="file-upload-outline" size={36} color={theme.colors.cedar} />
-              </View>
-              <Text style={styles.uploadText}>Tap to upload PDF</Text>
-              <Text style={styles.supportedText}>Bank and mobile-money statements</Text>
-            </>
-          )}
+        <TouchableOpacity style={styles.uploadArea} onPress={handlePDFPick}>
+          <View style={styles.iconBadge}>
+            <MaterialCommunityIcons name="file-alert-outline" size={36} color={theme.colors.cedar} />
+          </View>
+          <Text style={styles.uploadText}>PDF import is not available</Text>
+          <Text style={styles.supportedText}>
+            You can pick a file to confirm it stays out of the ledger. This version does not read statement PDFs.
+          </Text>
+          {pickedName ? (
+            <Text style={styles.supportedText}>Not imported: {pickedName}</Text>
+          ) : null}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

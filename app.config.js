@@ -1,22 +1,14 @@
 /**
- * Dynamic Expo config so EXPO_PUBLIC_OPENROUTER_* from .env / EAS env
- * is available both via process.env (Metro) and Constants.expoConfig.extra.
- * Local `expo start` / `expo run:*` pick up .env; EAS builds need the same
- * vars set on the Expo project environment (preview / production).
+ * Static Expo config passthrough.
  *
- * Uses the `config` argument (values from app.json) so expo-doctor accepts
- * having both a static app.json and this dynamic app.config.js.
+ * Do not read EXPO_PUBLIC_OPENROUTER_API_KEY (or any provider secret) here.
+ * Expo inlines EXPO_PUBLIC_* into the native binary and the web bundle.
+ * This repo has no authenticated backend, so chat stays off instead of
+ * shipping a billable key. See lib/openrouter.ts.
  */
 module.exports = ({ config }) => {
-  const apiKey = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY ?? '';
-  const model = process.env.EXPO_PUBLIC_OPENROUTER_MODEL ?? '';
-
-  return {
-    ...config,
-    extra: {
-      ...(config.extra ?? {}),
-      openRouterApiKey: apiKey,
-      openRouterModel: model,
-    },
-  };
+  const extra = { ...(config.extra ?? {}) };
+  delete extra.openRouterApiKey;
+  delete extra.openRouterModel;
+  return { ...config, extra };
 };

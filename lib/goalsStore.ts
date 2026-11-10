@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SEED_GOALS } from '@/lib/goalsSeed';
 
 const GOALS_KEY = 'financial_goals_v1';
 
@@ -32,19 +31,6 @@ function normalizePeriod(value: unknown): GoalPeriod {
   return 'monthly';
 }
 
-function seedGoals(): FinancialGoal[] {
-  return SEED_GOALS.map((b, i) => ({
-    id: `goal-${i + 1}`,
-    name: b.name,
-    target: b.budget,
-    current: b.spent,
-    period: 'monthly' as const,
-    kind: 'budget' as const,
-    icon: b.icon,
-    status: 'active' as const,
-  }));
-}
-
 function withStatus(
   goal: Omit<FinancialGoal, 'status' | 'period'> & {
     status?: 'active' | 'completed';
@@ -64,15 +50,17 @@ function withStatus(
 export async function getGoals(): Promise<FinancialGoal[]> {
   try {
     const raw = await AsyncStorage.getItem(GOALS_KEY);
-    if (!raw) {
-      const seeded = seedGoals();
-      await AsyncStorage.setItem(GOALS_KEY, JSON.stringify(seeded));
-      return seeded;
-    }
-    return (JSON.parse(raw) as FinancialGoal[]).map((g) => withStatus(g));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as FinancialGoal[];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((g) => withStatus(g));
   } catch {
-    return seedGoals();
+    return [];
   }
+}
+
+export async function clearGoals(): Promise<void> {
+  await AsyncStorage.removeItem(GOALS_KEY);
 }
 
 async function persist(goals: FinancialGoal[]): Promise<FinancialGoal[]> {

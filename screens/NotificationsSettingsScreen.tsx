@@ -93,7 +93,7 @@ export default function NotificationsSettingsScreen() {
     if (enabled) {
       setBusy(true);
       try {
-        const next = await registerForPushNotifications();
+        const next = await registerForPushNotifications({ prompt: true });
         if (next) notificationService.success('Push notifications enabled');
         else {
           notificationService.warning('Enable notifications in device settings');

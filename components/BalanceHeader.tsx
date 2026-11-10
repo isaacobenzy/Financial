@@ -105,6 +105,9 @@ export default function BalanceHeader() {
             </View>
           </View>
           <Text style={styles.balanceAmount}>{show(balance.total)}</Text>
+          {balance.smsImports === 0 ? (
+            <Text style={styles.emptyNote}>No imported activity yet. Sample amounts are not added.</Text>
+          ) : null}
 
           <View style={styles.chips}>
             <View style={styles.chip}>
@@ -187,7 +190,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: theme.colors.white,
     marginTop: 8,
-    marginBottom: 16,
+    marginBottom: 8,
+  },
+  emptyNote: {
+    color: theme.colors.sage,
+    fontSize: 12,
+    lineHeight: 16,
+    marginBottom: 12,
   },
   chips: {
     flexDirection: 'row',

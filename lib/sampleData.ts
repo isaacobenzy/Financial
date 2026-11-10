@@ -1,9 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  getImportedTransactions,
-  hasRealImportedTransactions,
-  recalculateLedgerBalance,
-} from '@/lib/ledgerStore';
+import { getImportedTransactions, hasRealImportedTransactions } from '@/lib/ledgerStore';
 import { getGoals } from '@/lib/goalsStore';
 import { refreshWidgetSnapshot } from '@/lib/widgetBridge';
 
@@ -21,8 +17,8 @@ function isSeedGoalId(id: string) {
 }
 
 /**
- * When the ledger has real imports, strip sample/demo rows, recompute balance
- * from real data only, and drop unmodified seed goals once.
+ * When the ledger has real imports, strip sample/demo rows and drop unmodified
+ * seed goals once. Does not rewrite the saved ledger balance.
  * Safe to call on every app open / import.
  */
 export async function ensureRealDataEverywhere(): Promise<{
@@ -42,8 +38,8 @@ export async function ensureRealDataEverywhere(): Promise<{
     await AsyncStorage.setItem(IMPORTED_KEY, JSON.stringify(realOnly));
   }
 
-  // Always recompute so a cached demo base balance cannot linger.
-  await recalculateLedgerBalance(realOnly);
+  // Saved balances are never rewritten here (see docs/release/LEDGER-TOTAL-MIGRATION.md).
+  // The saved total only moves on an explicit import, via recalculateLedgerBalance.
 
   let alreadyPurged = false;
   try {

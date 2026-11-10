@@ -27,6 +27,10 @@ function daysBetween(a: string, b: string) {
   return Math.round(ms / (24 * 60 * 60 * 1000));
 }
 
+export async function clearStreak(): Promise<void> {
+  await AsyncStorage.removeItem(STREAK_KEY);
+}
+
 export async function getStreak(): Promise<StreakState> {
   try {
     const raw = await AsyncStorage.getItem(STREAK_KEY);
@@ -119,10 +123,10 @@ export async function getAchievements(): Promise<Achievement[]> {
     },
     {
       id: 'privacy-first',
-      title: 'On-device ledger',
-      detail: 'SMS parsing stays on your phone',
+      title: 'On-device parsing',
+      detail: 'Imported SMS text was parsed on this phone',
       icon: 'shield-check',
-      unlocked: true,
+      unlocked: imported.length > 0,
     },
   ];
 }

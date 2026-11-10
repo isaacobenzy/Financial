@@ -38,7 +38,14 @@
       "env": {
         "EAS_BUILD_NO_EXPO_GO_WARNING": "true"
       },
-      "environment": "production"
+      "environment": "production",
+      "autoIncrement": true
+    },
+    "production-apk": {
+      "extends": "production",
+      "android": {
+        "buildType": "apk"
+      }
     }
   },
   "submit": {

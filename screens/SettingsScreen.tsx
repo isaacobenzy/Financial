@@ -5,7 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,7 +13,6 @@ import { useFocusEffect, useRouter, useSegments } from 'expo-router';
 import {
   getPermissionStatuses,
   openAppSettings,
-  requestAllAppPermissions,
   requestPermission,
   type PermissionStatus,
 } from '@/lib/permissions';
@@ -22,6 +21,7 @@ import { tabContentPaddingBottom } from '@/constants/layout';
 import { theme } from '@/constants/theme';
 import NaviiAvatar from '@/components/NaviiAvatar';
 import { clearSession, getSession, type UserSession } from '@/lib/session';
+import { clearSharedOnDeviceFinancialData, deleteLocalAccount } from '@/lib/deviceData';
 import {
   clearAppUnlock,
   getBiometricLabel,
@@ -45,7 +45,6 @@ export default function SettingsScreen() {
   const isTab = segments.includes('(tabs)');
   const [session, setSession] = useState<UserSession | null>(null);
   const [permissions, setPermissions] = useState<PermissionStatus[]>([]);
-  const [loadingPerms, setLoadingPerms] = useState(false);
   const [bioOn, setBioOn] = useState(false);
   const [bioAvailable, setBioAvailable] = useState(false);
   const [bioLabel, setBioLabel] = useState('Biometrics');
@@ -64,17 +63,6 @@ export default function SettingsScreen() {
       refresh();
     }, [refresh]),
   );
-
-  const grantAll = async () => {
-    setLoadingPerms(true);
-    try {
-      const next = await requestAllAppPermissions();
-      setPermissions(next);
-      notificationService.success('Permissions updated for this device');
-    } finally {
-      setLoadingPerms(false);
-    }
-  };
 
   const toggleBio = async (value: boolean) => {
     if (value) {
@@ -98,23 +86,79 @@ export default function SettingsScreen() {
     router.replace('/login');
   };
 
+  const deleteThisAccount = () => {
+    const email = session?.email;
+    if (!email) {
+      notificationService.error('Sign in first');
+      return;
+    }
+    Alert.alert(
+      'Delete this account on this phone?',
+      'This removes only the signed-in account. The ledger and goals stay, because every profile on this phone shares them. Nothing is sent to a server. A password verifier does not encrypt the ledger.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete account',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              await deleteLocalAccount(email);
+              await notifyAuthEvent('logout');
+              router.replace('/login');
+            })();
+          },
+        },
+      ],
+    );
+  };
+
+  const clearSharedLedger = () => {
+    Alert.alert(
+      'Clear the shared ledger and goals?',
+      'Transactions and goals on this phone are shared by every profile. Clearing them removes that activity for all of those profiles. Account sign-in records stay. This cannot be undone from the app.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear shared data',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              await clearSharedOnDeviceFinancialData();
+              notificationService.success('Shared ledger and goals were cleared on this phone');
+            })();
+          },
+        },
+      ],
+    );
+  };
+
   const onPermPress = async (perm: PermissionStatus) => {
-    if (perm.alternateAction === 'paste-sms') {
-      router.push('/paste-sms');
+    if (perm.alternateAction === 'paste-sms' || perm.id === 'sms') {
+      router.push('/import-sms');
+      return;
+    }
+    if (perm.id === 'storage') {
+      notificationService.info(
+        'Files open through the system picker. This app does not request photo or storage access, and PDF statements are not imported.',
+      );
       return;
     }
     if (!perm.available) {
       notificationService.info(perm.description);
       return;
     }
-    if (perm.granted) {
+    if (perm.id === 'notifications' && perm.granted) {
       await openAppSettings();
       return;
     }
-    const ok = await requestPermission(perm.id);
-    setPermissions(await getPermissionStatuses());
-    if (ok) notificationService.success(`${perm.label} is on`, 'Permission granted');
-    else notificationService.error(`${perm.label} was denied`, 'Permission needed');
+    if (perm.id === 'notifications') {
+      const ok = await requestPermission(perm.id);
+      setPermissions(await getPermissionStatuses());
+      if (ok) notificationService.success(`${perm.label} is on`, 'Permission granted');
+      else notificationService.error(`${perm.label} was denied`, 'Permission needed');
+      return;
+    }
+    notificationService.info(perm.description);
   };
 
   const visiblePerms = permissions.filter((p) => p.id !== 'biometrics');
@@ -213,16 +257,6 @@ export default function SettingsScreen() {
         </SettingsSection>
 
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.primaryBtn} onPress={grantAll} disabled={loadingPerms}>
-            {loadingPerms ? (
-              <ActivityIndicator color={theme.colors.white} />
-            ) : (
-              <>
-                <MaterialCommunityIcons name="shield-check" size={18} color={theme.colors.white} />
-                <Text style={styles.primaryBtnText}>Grant available permissions</Text>
-              </>
-            )}
-          </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryBtn} onPress={openAppSettings}>
             <Text style={styles.secondaryBtnText}>Open system settings</Text>
           </TouchableOpacity>
@@ -260,14 +294,29 @@ export default function SettingsScreen() {
         <SettingsSection title="Account">
           <View style={styles.legalBox}>
             <Text style={styles.legalText}>
-              Ledger data stays on this device. SMS parsing is local. AI uses your ledger context via
-              OpenRouter.
+              The ledger and goals are stored on this phone and are shared by every profile here.
+              SMS text is parsed here. This build does not send the ledger to a server. A stored
+              password verifier does not encrypt the ledger. There is no privacy-policy link in this build.
             </Text>
           </View>
           <SettingsNavRow
             icon="file-document-outline"
             label="Terms & Conditions"
             onPress={() => router.push('/terms')}
+          />
+          <SettingsNavRow
+            icon="delete-outline"
+            label="Delete this account"
+            description="Sign-in record only. The shared ledger stays."
+            onPress={deleteThisAccount}
+            danger
+          />
+          <SettingsNavRow
+            icon="trash-can-outline"
+            label="Clear shared ledger and goals"
+            description="Separate step. Affects every profile on this phone."
+            onPress={clearSharedLedger}
+            danger
           />
           <SettingsNavRow
             icon="logout"

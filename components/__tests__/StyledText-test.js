@@ -1,11 +1,11 @@
 import * as React from 'react';
 import renderer, { act } from 'react-test-renderer';
 
+import { MonoText } from '../StyledText';
+
 jest.mock('../useColorScheme', () => ({
   useColorScheme: () => 'light',
 }));
-
-import { MonoText } from '../StyledText';
 
 it('renders correctly', () => {
   let tree;
