@@ -4,7 +4,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 
 /** Web Crypto can afford a higher work factor; Hermes uses pure-JS PBKDF2. */
 const PBKDF2_ITERATIONS_NATIVE = 72_000;
-const PBKDF2_ITERATIONS_WEB = 210_000;
+const PBKDF2_ITERATIONS_WEB = 600_000; // OWASP 2023 PBKDF2-SHA256 guidance; older hashes are upgraded on next sign-in (lib/accounts.ts)
 const SALT_BYTES = 16;
 const KEY_BYTES = 32;
 
